@@ -1,0 +1,51 @@
+# ---- Secrets (never commit - this repo is public) ----
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*-credentials.json
+serviceAccount*.json
+local.settings.json
+
+# ---- Azure ----
+.azure/
+*.azd/
+
+# ---- Python ----
+venv/
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.ipynb_checkpoints/
+
+# ---- Node / Web ----
+node_modules/
+.next/
+dist/
+web-build/
+.expo/
+
+# ---- ML / derived data ----
+mlruns/
+outputs/
+*.pkl
+data/processed/
+data/interim/
+
+# ---- Evaluation reports (keep the baseline) ----
+evals/reports/*
+!evals/reports/.gitkeep
+!evals/reports/baseline.json
+
+# ---- OS / IDE ----
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

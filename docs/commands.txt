@@ -1,0 +1,214 @@
+================================================================================
+ CHEAT SHEET — uv · make · az · azd
+ Project: Multi_Agents-Recommendation-system-azure
+ Replace every <...> placeholder. Never put a secret value here (public repo).
+================================================================================
+
+
+--------------------------------------------------------------------------------
+ 1. UV — Python environments
+--------------------------------------------------------------------------------
+
+# Install a uv-managed Python version
+uv python install 3.11
+uv python list                                  # available / installed versions
+
+# Project venv (Python 3.11)
+uv venv --python 3.11 .venv
+source .venv/bin/activate                       # activate (optional when using make)
+deactivate                                      # deactivate
+
+# Install the project in editable mode + extras
+uv pip install --python .venv/bin/python -e ".[dev]"
+uv pip install --python .venv/bin/python -e ".[dev,ml,evals]"
+
+# Inspect the venv
+uv pip list --python .venv
+uv pip show --python .venv/bin/python <package>  # version actually installed
+
+# Resolve dependencies WITHOUT installing (debug conflicts)
+uv pip compile requirements.txt --python-version 3.12
+
+# Isolated CLI tools (outside the project venv): az, etc.
+uv tool list
+uv tool install <tool>
+uv tool uninstall <tool>
+uv tool update-shell                            # adds ~/.local/bin to PATH
+
+# ⚠️ Azure CLI via uv: --prerelease allow is REQUIRED
+#   (otherwise uv silently falls back to azure-cli 2.0.67, from 2019)
+uv tool install azure-cli --python 3.12 --prerelease allow
+uv tool upgrade azure-cli --prerelease allow    # do NOT use `az upgrade`
+#   The shipped `az` script calls whatever `python` is on PATH (Anaconda) → replace it
+#   with this wrapper (redo it if uv recreates the symlink after an upgrade):
+#   rm ~/.local/bin/az
+#   cat > ~/.local/bin/az <<'EOF'
+#   #!/usr/bin/env bash
+#   exec "$HOME/.local/share/uv/tools/azure-cli/bin/python" -m azure.cli "$@"
+#   EOF
+#   chmod +x ~/.local/bin/az
+
+
+--------------------------------------------------------------------------------
+ 2. MAKE — project shortcuts (they call .venv/bin directly)
+--------------------------------------------------------------------------------
+
+make venv          # creates .venv if missing
+make install       # api + dev deps, pre-commit hooks
+make install-all   # + ml and evals extras
+make check         # lint + typecheck + tests with coverage (= what CI runs)
+make run           # local API on http://localhost:8000
+make eval          # evaluation suite (day 5)
+make secrets       # gitleaks scan of the working tree
+
+
+--------------------------------------------------------------------------------
+ 3. AZ — login and subscription
+--------------------------------------------------------------------------------
+
+az version
+az login                                        # opens the browser
+az login --use-device-code                      # when no browser is available
+az logout
+
+az account list -o table
+az account set --subscription "<subscription-id>"
+az account show -o table
+az ad signed-in-user show --query id -o tsv     # your object id (for RBAC)
+
+# Test keyless auth (what DefaultAzureCredential does locally)
+az account get-access-token --resource https://cognitiveservices.azure.com --query expiresOn
+
+
+--------------------------------------------------------------------------------
+ 4. AZ — output formats and queries (JMESPath)
+--------------------------------------------------------------------------------
+
+-o table | json | tsv | yaml                     # tsv = best for capturing a value into a shell variable
+--query "<JMESPath expression>"
+
+# Examples
+az group list --query "[].name" -o tsv
+az resource list -g <rg> --query "[].{name:name, type:type}" -o table
+RG_ID=$(az group show -n <rg> --query id -o tsv)
+
+
+--------------------------------------------------------------------------------
+ 5. AZ — resource providers (once per subscription)
+--------------------------------------------------------------------------------
+
+az provider register --namespace Microsoft.CognitiveServices
+az provider show --namespace Microsoft.CognitiveServices --query registrationState -o tsv
+az provider list --query "[?registrationState=='Registered'].namespace" -o tsv | sort
+
+# The ones this project needs:
+# Microsoft.CognitiveServices Microsoft.Search Microsoft.DocumentDB Microsoft.Storage
+# Microsoft.App Microsoft.ContainerRegistry Microsoft.KeyVault
+# Microsoft.OperationalInsights Microsoft.Insights Microsoft.MachineLearningServices
+# Microsoft.ManagedIdentity Microsoft.AlertsManagement Microsoft.Consumption
+
+
+--------------------------------------------------------------------------------
+ 6. AZ — resource groups and resources
+--------------------------------------------------------------------------------
+
+az group create -n rg-coffeeai-dev -l swedencentral
+az group list -o table
+az resource list -g rg-coffeeai-dev -o table
+az group delete -n rg-coffeeai-dev --yes --no-wait     # ⚠️ deletes the WHOLE group
+
+az account list-locations --query "[].name" -o tsv    # available regions
+
+
+--------------------------------------------------------------------------------
+ 7. AZ — Azure OpenAI (models, quotas)
+--------------------------------------------------------------------------------
+
+# Models available in a region
+az cognitiveservices model list -l swedencentral \
+  --query "[?model.format=='OpenAI'].{name:model.name, version:model.version}" -o table
+
+# Quotas (TPM) used / available in a region
+az cognitiveservices usage list -l swedencentral -o table
+
+# Accounts and deployments
+az cognitiveservices account list -g <rg> -o table
+az cognitiveservices account deployment list -n <openai-account> -g <rg> -o table
+
+
+--------------------------------------------------------------------------------
+ 8. AZ — Bicep / infrastructure deployments
+--------------------------------------------------------------------------------
+
+az bicep install
+az bicep build -f infra/main.bicep                    # validates the syntax
+
+# Preview (changes nothing), then deploy
+az deployment group what-if -g <rg> -f infra/main.bicep -p infra/main.parameters.json
+az deployment group create  -g <rg> -f infra/main.bicep -p infra/main.parameters.json
+
+az deployment group list -g <rg> -o table
+az deployment group show -g <rg> -n <deployment> --query properties.outputs
+
+
+--------------------------------------------------------------------------------
+ 9. AZ — identity and RBAC
+--------------------------------------------------------------------------------
+
+az role assignment list --assignee <principal-id> --all -o table
+az role assignment create --assignee <principal-id> \
+  --role "Cognitive Services OpenAI User" --scope <resource-id>
+az identity list -g <rg> -o table
+
+
+--------------------------------------------------------------------------------
+ 10. AZ — costs
+--------------------------------------------------------------------------------
+
+az consumption budget list -o table
+# Detailed spend: portal → Cost Management → Cost analysis (easier to read)
+# REMINDER: a budget only ALERTS, it never BLOCKS spending.
+
+
+--------------------------------------------------------------------------------
+ 11. AZ — Container Registry and Container Apps (day 6)
+--------------------------------------------------------------------------------
+
+az acr login -n <acr-name>
+az acr repository list -n <acr-name> -o table
+# Build in Azure (avoids the Mac arm64 issue):
+az acr build -r <acr-name> -t coffee-ai-api:<tag> -f src/api/Dockerfile .
+# Local build targeting Azure:
+docker build --platform linux/amd64 -t coffee-ai-api:local -f src/api/Dockerfile .
+
+az containerapp show -n <app> -g <rg> --query properties.configuration.ingress.fqdn -o tsv
+az containerapp logs show -n <app> -g <rg> --follow
+az containerapp revision list -n <app> -g <rg> -o table
+# Blue/green: split traffic between revisions / rollback
+az containerapp ingress traffic set -n <app> -g <rg> --revision-weight <revision>=100
+
+
+--------------------------------------------------------------------------------
+ 12. AZ — extensions (Azure ML on day 4)
+--------------------------------------------------------------------------------
+
+az extension add -n ml
+az extension list -o table
+az ml job create -f src/ml/pipeline.yml -g <rg> -w <workspace>
+az ml job list -g <rg> -w <workspace> -o table
+az ml compute stop -n <compute> -g <rg> -w <workspace>    # ⚠️ end of every day
+
+
+--------------------------------------------------------------------------------
+ 13. AZD — Azure Developer CLI
+--------------------------------------------------------------------------------
+
+azd version
+azd auth login
+azd env new dev                 # creates an environment (.azure/dev folder, gitignored)
+azd env list
+azd env get-values              # Bicep outputs (endpoints…) → handy for a local .env
+azd provision                   # infrastructure only (Bicep)
+azd deploy                      # code only
+azd up                          # provision + deploy
+azd down --purge                # ⚠️ deletes everything, including soft-deleted resources
