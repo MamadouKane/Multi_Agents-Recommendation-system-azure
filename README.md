@@ -9,7 +9,7 @@ A multi-agent conversational assistant for a coffee shop: order taking, product 
 
 ```
 Web / Mobile → Container Apps (FastAPI orchestrator)
-                  ├─ Azure OpenAI ......... gpt-5.6-luna + text-embedding-3-small
+                  ├─ Azure OpenAI ......... gpt-5.4-mini + text-embedding-3-small
                   ├─ Azure AI Search ...... hybrid RAG (BM25 + vector + semantic ranker)
                   ├─ Cosmos DB ............ catalogue + conversations
                   ├─ Blob Storage ......... images + model artefacts

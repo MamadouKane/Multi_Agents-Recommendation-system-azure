@@ -44,6 +44,9 @@ evals/reports/*
 !evals/reports/.gitkeep
 !evals/reports/baseline.json
 
+# ---- Docs (temporarily untracked: cleanup in progress, re-added at the end of the project) ----
+docs/
+
 # ---- OS / IDE ----
 .DS_Store
 Thumbs.db
