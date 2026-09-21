@@ -1,12 +1,12 @@
 ================================================================================
- CHEAT SHEET — uv · make · az · azd
+ CHEAT SHEET: uv · make · az · azd
  Project: Multi_Agents-Recommendation-system-azure
  Replace every <...> placeholder. Never put a secret value here (public repo).
 ================================================================================
 
 
 --------------------------------------------------------------------------------
- 1. UV — Python environments
+ 1. UV: Python environments
 --------------------------------------------------------------------------------
 
 # Install a uv-managed Python version
@@ -50,7 +50,7 @@ uv tool upgrade azure-cli --prerelease allow    # do NOT use `az upgrade`
 
 
 --------------------------------------------------------------------------------
- 2. MAKE — project shortcuts (they call .venv/bin directly)
+ 2. MAKE: project shortcuts (they call .venv/bin directly)
 --------------------------------------------------------------------------------
 
 make venv          # creates .venv if missing
@@ -63,7 +63,7 @@ make secrets       # gitleaks scan of the working tree
 
 
 --------------------------------------------------------------------------------
- 3. AZ — login and subscription
+ 3. AZ: login and subscription
 --------------------------------------------------------------------------------
 
 az version
@@ -81,7 +81,7 @@ az account get-access-token --resource https://cognitiveservices.azure.com --que
 
 
 --------------------------------------------------------------------------------
- 4. AZ — output formats and queries (JMESPath)
+ 4. AZ: output formats and queries (JMESPath)
 --------------------------------------------------------------------------------
 
 -o table | json | tsv | yaml                     # tsv = best for capturing a value into a shell variable
@@ -94,7 +94,7 @@ RG_ID=$(az group show -n <rg> --query id -o tsv)
 
 
 --------------------------------------------------------------------------------
- 5. AZ — resource providers (once per subscription)
+ 5. AZ: resource providers (once per subscription)
 --------------------------------------------------------------------------------
 
 az provider register --namespace Microsoft.CognitiveServices
@@ -109,7 +109,7 @@ az provider list --query "[?registrationState=='Registered'].namespace" -o tsv |
 
 
 --------------------------------------------------------------------------------
- 6. AZ — resource groups and resources
+ 6. AZ: resource groups and resources
 --------------------------------------------------------------------------------
 
 az group create -n rg-coffeeai-dev -l swedencentral
@@ -121,7 +121,7 @@ az account list-locations --query "[].name" -o tsv    # available regions
 
 
 --------------------------------------------------------------------------------
- 7. AZ — Azure OpenAI (models, quotas)
+ 7. AZ: Azure OpenAI (models, quotas)
 --------------------------------------------------------------------------------
 
 # Models available in a region
@@ -137,7 +137,7 @@ az cognitiveservices account deployment list -n <openai-account> -g <rg> -o tabl
 
 
 --------------------------------------------------------------------------------
- 8. AZ — Bicep / infrastructure deployments
+ 8. AZ: Bicep / infrastructure deployments
 --------------------------------------------------------------------------------
 
 az bicep install
@@ -152,7 +152,7 @@ az deployment group show -g <rg> -n <deployment> --query properties.outputs
 
 
 --------------------------------------------------------------------------------
- 9. AZ — identity and RBAC
+ 9. AZ: identity and RBAC
 --------------------------------------------------------------------------------
 
 az role assignment list --assignee <principal-id> --all -o table
@@ -162,7 +162,7 @@ az identity list -g <rg> -o table
 
 
 --------------------------------------------------------------------------------
- 10. AZ — costs
+ 10. AZ: costs
 --------------------------------------------------------------------------------
 
 az consumption budget list -o table
@@ -171,7 +171,7 @@ az consumption budget list -o table
 
 
 --------------------------------------------------------------------------------
- 11. AZ — Container Registry and Container Apps (day 6)
+ 11. AZ: Container Registry and Container Apps (day 6)
 --------------------------------------------------------------------------------
 
 az acr login -n <acr-name>
@@ -189,7 +189,7 @@ az containerapp ingress traffic set -n <app> -g <rg> --revision-weight <revision
 
 
 --------------------------------------------------------------------------------
- 12. AZ — extensions (Azure ML on day 4)
+ 12. AZ: extensions (Azure ML on day 4)
 --------------------------------------------------------------------------------
 
 az extension add -n ml
@@ -200,7 +200,7 @@ az ml compute stop -n <compute> -g <rg> -w <workspace>    # ⚠️ end of every 
 
 
 --------------------------------------------------------------------------------
- 13. AZD — Azure Developer CLI
+ 13. AZD: Azure Developer CLI
 --------------------------------------------------------------------------------
 
 azd version

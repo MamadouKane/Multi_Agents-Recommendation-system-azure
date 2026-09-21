@@ -1,4 +1,4 @@
-# Legacy — reference prototype
+# Legacy: reference prototype
 
 Source code of the original prototype (OpenAI + Pinecone + Firebase), kept **read-only** as a reference during the migration.
 
@@ -6,7 +6,7 @@ Source code of the original prototype (OpenAI + Pinecone + Firebase), kept **rea
 
 ## Why keep it
 
-1. **The prompts are the prototype's real asset** — several rounds of iteration went into them. `src/api/agents/` reuses them and hardens them (Structured Outputs, Pydantic) rather than rewriting from scratch.
+1. **The prompts are the prototype's real asset**: several rounds of iteration went into them. `src/api/agents/` reuses them and hardens them (Structured Outputs, Pydantic) rather than rewriting from scratch.
 2. **The recommendation artefacts** (`recommendation_objects/`) are the **baseline**: the day 4 Azure ML pipeline has to match or beat them.
 3. **The notebooks** document the original method (index construction, Apriori training, Firebase upload).
 
@@ -26,9 +26,9 @@ Source code of the original prototype (OpenAI + Pinecone + Firebase), kept **rea
 
 The requirements document (§1.2) lists 13. The critical ones, visible directly in this code:
 
-- **D1** — `order_taking_agent.py` has the LLM compute the order total inside its prompt.
-- **D2** — prices are hardcoded in the system prompt, duplicated with `products.jsonl` and `menu_items.txt`.
-- **D3** — `json.loads()` with no `try/except`; `double_check_json_output()` is a workaround costing one extra LLM call per turn.
-- **D8** — `details_agent.py` and `recommendation_agent.py` **overwrite** `messages[-1]['content']` to inject RAG context.
+- **D1**: `order_taking_agent.py` has the LLM compute the order total inside its prompt.
+- **D2**: prices are hardcoded in the system prompt, duplicated with `products.jsonl` and `menu_items.txt`.
+- **D3**: `json.loads()` with no `try/except`; `double_check_json_output()` is a workaround costing one extra LLM call per turn.
+- **D8**: `details_agent.py` and `recommendation_agent.py` **overwrite** `messages[-1]['content']` to inject RAG context.
 
 **Planned removal**: once day 5 passes (all evaluation thresholds green), this folder is deleted. Its history stays in Git.

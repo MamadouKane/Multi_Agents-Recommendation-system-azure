@@ -1,4 +1,4 @@
-# Requirements Specification — Merry's Way AI Assistant (Azure migration)
+# Requirements Specification: Merry's Way AI Assistant (Azure migration)
 
 **Version** 1.2 · **Date** 2026-09-18 · **Author** Mamadou Kane
 **Status** To be approved before day 1
@@ -18,7 +18,7 @@ The current project is a multi-agent chatbot for a fictional coffee shop ("Merry
 | RAG | Pinecone serverless + `text-embedding-3-small` (1536d), **20 documents** (18 product records + about page + menu), namespace `ns1`, top_k=2 | `legacy/notebooks/build_vector_database.ipynb` |
 | Recommender | Apriori (mlxtend), `min_support=0.05`, `lift>1` → 16 rules + popularity table (19 rows) | `legacy/notebooks/recommendation_engine_training.ipynb` |
 | Sales data | Kaggle coffee shop sample, 49,894 transaction lines (April 2019), 3 outlets | `data/raw/sales/` |
-| Product catalogue | **18 products**, JSONL + **18 images** — the menu advertises 19 (see D11) | `data/raw/` |
+| Product catalogue | **18 products**, JSONL + **18 images**: the menu advertises 19 (see D11) | `data/raw/` |
 | Product persistence | Firebase Realtime Database + Firebase Storage | `legacy/notebooks/firebase_uploader.ipynb` |
 | API | FastAPI / Uvicorn, `POST /chat`, `GET /health`, Docker | `legacy/main.py` |
 | Front end | React Native / Expo (iOS, Android, web) | not migrated |
@@ -26,7 +26,7 @@ The current project is a multi-agent chatbot for a fictional coffee shop ("Merry
 **Current execution chain:** `user → GuardAgent (allowed?) → ClassificationAgent (routing) → {DetailsAgent | OrderTakingAgent | RecommendationAgent} → response`.
 `OrderTakingAgent` chains into `RecommendationAgent` for upselling as soon as the order holds at least one item and the upsell has not happened yet (`asked_recommendation_before`).
 
-Conversation state travels in the `memory` field of each assistant message (`step number`, `order`, `agent`) and is echoed back by the client on every turn — the API is **stateless**.
+Conversation state travels in the `memory` field of each assistant message (`step number`, `order`, `agent`) and is echoed back by the client on every turn: the API is **stateless**.
 
 ### 1.2 Technical debt identified (to be cleared during the migration)
 
@@ -37,12 +37,12 @@ Conversation state travels in the `memory` field of each assistant message (`ste
 | D3 | `json.loads()` **without try/except** on LLM output; the `double_check_json_output` workaround costs one extra LLM call per turn | `utils.py`, `order_taking_agent.py` | 🔴 Critical | Structured Outputs (strict `json_schema`) + Pydantic |
 | D4 | **`EXPO_PUBLIC_API_KEY` is bundled into the client** → the API key is effectively public | mobile `.env` | 🔴 Critical | Entra ID / APIM; never a secret on the client |
 | D5 | `CORS allow_origins=["*"]` with `allow_headers=["*"]` | `main.py` | 🟠 Major | Explicit origin allowlist |
-| D6 | The guardrail relies **on an LLM alone** — no jailbreak or prompt-injection protection | `guard_agent.py` | 🟠 Major | Azure AI Content Safety + Prompt Shields upstream |
+| D6 | The guardrail relies **on an LLM alone**: no jailbreak or prompt-injection protection | `guard_agent.py` | 🟠 Major | Azure AI Content Safety + Prompt Shields upstream |
 | D7 | RAG: hardcoded `top_k=2`, no reranking, no score threshold, chunk = whole document | `details_agent.py` | 🟠 Major | Hybrid search + semantic ranker + threshold |
 | D8 | `messages[-1]['content']` is **overwritten** with the RAG prompt, polluting the history sent back to the LLM | `details_agent.py`, `recommendation_agent.py` | 🟠 Major | Inject context in a dedicated system message |
 | D9 | `AgentController()` instantiated at import time → slow cold start, no FastAPI `lifespan` | `main.py` | 🟡 Minor | Lifespan + reused clients |
 | D10 | Apriori key is `"_".join(antecedents)` but lookup happens per single product → any multi-item antecedent rule is silently ignored (0/16 affected today, a time bomb if `min_support` drops) | `recommendation_agent.py` | 🟡 Minor | Canonical serialised frozenset key, or explicit `len(antecedents)==1` filter |
-| D11 | **"Dark chocolate": a three-way price inconsistency.** The menu advertises two lines (Drinking $5.00 / Packaged $3.00); `products.jsonl` holds **only one** (Drinking, $5.00, 18 products total); the popularity table holds **two** (947 and 22 transactions). A customer ordering "Dark chocolate" can be billed $5.00 or $3.00 arbitrarily, and the recommender can suggest the Packaged variant, which has no catalogue record | `products.jsonl`, `menu_items.txt`, `order_taking_agent.py`, `recommendation_engine_training.ipynb` | 🔴 **Critical** (breaks OM4) | Explicit product IDs (`dark-chocolate-drinking` / `dark-chocolate-packaged`); create the missing record **or** drop the menu line — decision due on day 2 |
+| D11 | **"Dark chocolate": a three-way price inconsistency.** The menu advertises two lines (Drinking $5.00 / Packaged $3.00); `products.jsonl` holds **only one** (Drinking, $5.00, 18 products total); the popularity table holds **two** (947 and 22 transactions). A customer ordering "Dark chocolate" can be billed $5.00 or $3.00 arbitrarily, and the recommender can suggest the Packaged variant, which has no catalogue record | `products.jsonl`, `menu_items.txt`, `order_taking_agent.py`, `recommendation_engine_training.ipynb` | 🔴 **Critical** (breaks OM4) | Explicit product IDs (`dark-chocolate-drinking` / `dark-chocolate-packaged`); create the missing record **or** drop the menu line; decision due on day 2 |
 | D12 | `DataFrame.applymap` deprecated (pandas ≥ 2.1) | same notebook | 🟢 Trivial | `.map()` |
 | D13 | **No tests, no evaluation, no tracing, no cost tracking** | everywhere | 🔴 Critical | Days 5 and 7 |
 
@@ -56,7 +56,7 @@ Move from a notebook prototype stitched across heterogeneous SaaS (OpenAI + Pine
 
 ## 2. Objectives
 
-### 2.1 Business objectives (fictional but measurable — they drive the evaluations)
+### 2.1 Business objectives (fictional but measurable, they drive the evaluations)
 
 | ID | Objective | KPI | v1 target |
 |---|---|---|---|
@@ -77,7 +77,7 @@ Move from a notebook prototype stitched across heterogeneous SaaS (OpenAI + Pine
 | OT5 | Continuous deployment with rollback in under 2 minutes (Container Apps revisions) |
 | OT6 | Cost controlled and observable per conversation |
 
-### 2.3 Learning objectives (explicit — they justify some deliberately "sub-optimal" choices)
+### 2.3 Learning objectives (explicit, they justify some deliberately "sub-optimal" choices)
 
 Azure OpenAI / AI Foundry · Azure AI Search (vector, hybrid, semantic ranker) · Azure Machine Learning (pipelines, MLflow, model registry) · Azure Container Apps · Bicep / azd · GitHub Actions + OIDC · Azure Monitor / Application Insights / OpenTelemetry · Azure AI Evaluation SDK + red teaming · Azure AI Content Safety · Cosmos DB.
 
@@ -98,7 +98,7 @@ Azure OpenAI / AI Foundry · Azure AI Search (vector, hybrid, semantic ranker) �
 - **F9** Complete infrastructure as code
 - **F10** CI/CD (lint, tests, build, eval, deploy)
 - **F11** Observability: traces, metrics, cost, alerts, dashboard
-- **F12** Minimal web front end (chat + catalogue) — **deliberately low priority**
+- **F12** Minimal web front end (chat + catalogue), **deliberately low priority**
 
 ### 3.2 Out of scope (v1)
 
@@ -106,9 +106,9 @@ Real payments · End-customer authentication with user accounts · Multilingual 
 
 ### 3.3 Prioritisation
 
-- **P0 — blocking**: F1, F3, F5, F7, F9, F10 (partial), F11 (partial)
-- **P1 — important**: F2, F4, F6, F8, F11 (complete)
-- **P2 — if time allows**: F12, APIM, private endpoints, Agent Service
+- **P0: blocking**: F1, F3, F5, F7, F9, F10 (partial), F11 (partial)
+- **P1: important**: F2, F4, F6, F8, F11 (complete)
+- **P2: if time allows**: F12, APIM, private endpoints, Agent Service
 
 > ⚠️ **Feasibility warning.** Seven days at roughly 8 h/day (≈ 56 h) covers P0 + P1 **provided** the web front end and private networking do not creep in. The day 1 → day 7 plan is sized against that budget, and each day flags what can be dropped. Part-time, budget three weeks and keep the same breakdown.
 
@@ -118,10 +118,10 @@ Real payments · End-customer authentication with user accounts · Multilingual 
 
 ### 4.1 Personas
 
-- **Sarah, 28, customer in a hurry** — wants to order in three messages, no friction.
-- **Marc, 45, allergic to tree nuts** — needs **reliable** ingredient information. A hallucination here is a health risk.
-- **Léa, shop manager** — wants conversion rate, bot cost and failed conversations.
-- **You, the AI engineer** — must be able to debug a specific conversation and detect a regression before it ships.
+- **Sarah, 28, customer in a hurry**: wants to order in three messages, no friction.
+- **Marc, 45, allergic to tree nuts**: needs **reliable** ingredient information. A hallucination here is a health risk.
+- **Léa, shop manager**: wants conversion rate, bot cost and failed conversations.
+- **You, the AI engineer**: must be able to debug a specific conversation and detect a regression before it ships.
 
 ### 4.2 Primary user stories
 
@@ -147,7 +147,7 @@ Real payments · End-customer authentication with user accounts · Multilingual 
             └─────────────┤  (TLS, WAF, routing)          │
                           └──────────────┬───────────────┘
                                          │  (P2: Azure API Management
-                                         │   as AI gateway — token limits,
+                                         │   as AI gateway: token limits,
                                          │   semantic cache, quotas)
                           ┌──────────────▼───────────────┐
                           │   Azure Container Apps        │
@@ -182,49 +182,49 @@ Real payments · End-customer authentication with user accounts · Multilingual 
 
 | Current component | Target Azure service | Rationale | Alternative rejected |
 |---|---|---|---|
-| OpenAI API (`gpt-4o-mini`) | **Azure OpenAI** via **Azure AI Foundry**: `gpt-5.6-luna` (target) / `gpt-5.4-mini` (interim), **Data Zone Standard**, Sweden Central — see ADR-007 | Enterprise SLA, data not used for training, Entra ID RBAC, native evaluation/tracing integration, per-deployment quotas; Data Zone keeps processing inside the EU (NFR11) | `gpt-4.1-mini` (Legacy, no interactive quota, retires 2027-04-14). Foundry Models (Mistral, Llama) — worth a P2 cost/quality comparison |
+| OpenAI API (`gpt-4o-mini`) | **Azure OpenAI** via **Azure AI Foundry**: `gpt-5.6-luna` (target) / `gpt-5.4-mini` (interim), **Data Zone Standard**, Sweden Central (see ADR-007) | Enterprise SLA, data not used for training, Entra ID RBAC, native evaluation/tracing integration, per-deployment quotas; Data Zone keeps processing inside the EU (NFR11) | `gpt-4.1-mini` (Legacy, no interactive quota, retires 2027-04-14). Foundry Models (Mistral, Llama): worth a P2 cost/quality comparison |
 | `text-embedding-3-small` | **Azure OpenAI embeddings** (same model, 1536d) | Migration with no redesign; identical dimensionality | `text-embedding-3-large` (3072d): better but 6.5× the cost, unjustified over 20 documents |
 | **Pinecone** | **Azure AI Search** | Vector **plus BM25 and semantic ranker** in one service; integrated vectorisation (skillset); Blob indexer; OData filters | Cosmos DB vector (DiskANN): weaker hybrid search and reranking. PostgreSQL pgvector: more ops for no gain here |
 | **Firebase Realtime DB** (products) | **Azure Cosmos DB for NoSQL** (serverless) | Low latency, flexible schema matching the JSONL, Entra ID RBAC, serverless is near-free at this volume | Table Storage (too limited), Azure SQL (too rigid for this shape) |
-| **Firebase Storage** (images) | **Azure Blob Storage** + CDN/Front Door | Negligible cost, SAS or public read, lifecycle policies | — |
+| **Firebase Storage** (images) | **Azure Blob Storage** + CDN/Front Door | Negligible cost, SAS or public read, lifecycle policies | n/a |
 | FastAPI in Docker | **Azure Container Apps** (Consumption) | Scale-to-zero (≈ zero cost when idle), revisions + traffic splitting give native blue/green, managed identity, KEDA, managed TLS ingress | App Service: no equally flexible scale-to-zero for containers. AKS: oversized. Functions: poor fit for long-running LLM calls |
 | Docker image | **Azure Container Registry** (Basic) | Integrated, managed-identity auth | Docker Hub (no managed identity) |
-| Recommender training notebooks | **Azure Machine Learning** (pipeline + MLflow + model registry) | Versions data, code and model with lineage — this is **the** MLOps piece of the project | Running the notebook by hand (no learning value) |
+| Recommender training notebooks | **Azure Machine Learning** (pipeline + MLflow + model registry) | Versions data, code and model with lineage: this is **the** MLOps piece of the project | Running the notebook by hand (no learning value) |
 | Secrets in `.env` | **Azure Key Vault** + **Managed Identity** | Objective OT2: no plaintext keys anywhere | App settings alone (no rotation, no audit) |
 | LLM-only guard agent | **Azure AI Content Safety** (text moderation + **Prompt Shields**) plus an LLM scope guard | Two layers: fast deterministic safety, then business relevance | LLM guard alone (bypassable) |
 | *(missing)* Evaluation | **Azure AI Evaluation SDK** (`azure-ai-evaluation`) + **AI Red Teaming Agent** | Ready-made evaluators (groundedness, relevance, retrieval, content safety, intent resolution) plus an adversarial simulator | Ragas / DeepEval: excellent, but outside the Azure ecosystem and less instructive here |
 | *(missing)* Monitoring | **Application Insights** + **Log Analytics** via **OpenTelemetry** | Distributed traces, custom metrics (tokens, cost), KQL, alerts, workbooks | stdout logs only |
 | *(missing)* CI/CD | **GitHub Actions** + **OIDC federated credentials** | No Azure secret stored in GitHub | Azure DevOps (equivalent; GitHub reads better in a portfolio) |
 | *(missing)* IaC | **Bicep** + **Azure Developer CLI (`azd`)** | Azure-native; `azd up` provisions and deploys in one step | Terraform (also excellent; Bicep is more direct for learning Azure itself) |
-| React Native (kept) | **Azure Static Web Apps** for the **web** front end | Free hosting, built-in Entra auth, linked backend to Container Apps | — |
-| *(P2)* LLM governance | **Azure API Management** (AI gateway) | `azure-openai-token-limit`, semantic caching, token metrics, multi-deployment load balancing | — |
+| React Native (kept) | **Azure Static Web Apps** for the **web** front end | Free hosting, built-in Entra auth, linked backend to Container Apps | n/a |
+| *(P2)* LLM governance | **Azure API Management** (AI gateway) | `azure-openai-token-limit`, semantic caching, token metrics, multi-deployment load balancing | n/a |
 
 ### 5.3 Architecture decisions (to be formalised as ADRs on day 1)
 
-- **ADR-001 — Orchestration: hand-written, no framework.**
+- **ADR-001: Orchestration: hand-written, no framework.**
   We **keep the explicit Python orchestrator** rather than moving to Azure AI Foundry Agent Service, Semantic Kernel or LangGraph. Reasons: (a) the logic already exists and works, (b) full control over tracing and evaluation, (c) higher portfolio value (showing you can build, not only wire things together), (d) no extra runtime cost. Internal modernisation instead: Pydantic + Structured Outputs + FastAPI dependency injection.
-  *Optional day 7 spike:* reimplement only `DetailsAgent` on Agent Service to compare — good blog post material.
+  *Optional day 7 spike:* reimplement only `DetailsAgent` on Agent Service to compare: good blog post material.
 
-- **ADR-002 — Retrieval: hybrid plus semantic ranker.** Pure vector search over 20 documents performs poorly on lexical queries ("Carmel syrup", exact prices). Use hybrid (BM25 + vector, RRF fusion) then semantic reranking.
+- **ADR-002: Retrieval: hybrid plus semantic ranker.** Pure vector search over 20 documents performs poorly on lexical queries ("Carmel syrup", exact prices). Use hybrid (BM25 + vector, RRF fusion) then semantic reranking.
 
-- **ADR-003 — The LLM never touches money.** The LLM extracts `[{product_id, quantity}]`; totals are computed in Python from Cosmos DB. This clears D1 and makes OM4 achievable.
+- **ADR-003: The LLM never touches money.** The LLM extracts `[{product_id, quantity}]`; totals are computed in Python from Cosmos DB. This clears D1 and makes OM4 achievable.
 
-- **ADR-004 — The catalogue is the single source of truth.** The menu injected into prompts is **rendered at runtime** from Cosmos DB, never copied inline. This clears D2.
+- **ADR-004: The catalogue is the single source of truth.** The menu injected into prompts is **rendered at runtime** from Cosmos DB, never copied inline. This clears D2.
 
-- **ADR-005 — Stateless API, client-carried memory.** We keep the existing `memory` mechanism (the mobile app depends on it) but **persist** conversations to Cosmos DB for analytics and replay.
+- **ADR-005: Stateless API, client-carried memory.** We keep the existing `memory` mechanism (the mobile app depends on it) but **persist** conversations to Cosmos DB for analytics and replay.
 
-- **ADR-007 — Chat model and region** *(decided 2026-09-18, day 0)*. Region **Sweden Central**, deployment type **Data Zone Standard** (EU data residency, NFR11).
+- **ADR-007: Chat model and region** *(decided 2026-09-18, day 0)*. Region **Sweden Central**, deployment type **Data Zone Standard** (EU data residency, NFR11).
   - **Target: `gpt-5.6-luna`** (GA, retires 2028-01-11). Quota is 0 in every region checked (13) → quota request filed on day 0 (50K TPM, Data Zone Standard, Sweden Central).
   - **Interim: `gpt-5.4-mini`** (GA, retires 2027-09-21, 200K TPM Data Zone quota already available) so days 1-3 are not blocked.
   - **Rejected:** `gpt-4.1-mini` (Legacy, batch-only quota, retires 2027-04-14); `gpt-5-mini` (retires 2027-02-09, Global Standard only).
   - Code only ever references the **deployment name** (`AZURE_OPENAI_CHAT_DEPLOYMENT`), so switching models is a configuration change. Day 5 runs the golden suite on both models → quality / cost / latency comparison table.
-  - **Consequence:** the GPT-5 family are reasoning models — `temperature` / `top_p` are expected to be unsupported (legacy code uses `temperature=0, top_p=0.8`). Use `reasoning_effort` (low/minimal for guard and router) and `max_completion_tokens`; verify with a live call on day 1. Less sampling control → determinism comes from Structured Outputs and Python-side computation (ADR-003); evaluation must measure run-to-run variance.
+  - **Consequence:** the GPT-5 family are reasoning models: `temperature` / `top_p` are expected to be unsupported (legacy code uses `temperature=0, top_p=0.8`). Use `reasoning_effort` (low/minimal for guard and router) and `max_completion_tokens`; verify with a live call on day 1. Less sampling control → determinism comes from Structured Outputs and Python-side computation (ADR-003); evaluation must measure run-to-run variance.
 
 ---
 
 ## 6. Data model
 
-### 6.1 Cosmos DB — `products` container (partition key `/category`)
+### 6.1 Cosmos DB: `products` container (partition key `/category`)
 
 ```json
 {
@@ -243,9 +243,9 @@ Real payments · End-customer authentication with user accounts · Multilingual 
   "updated_at": "2026-09-18T10:00:00Z"
 }
 ```
-> `allergens` is a **new** field to be derived from the ingredients (US2 / Marc) — a functional gap in the prototype.
+> `allergens` is a **new** field to be derived from the ingredients (US2 / Marc), a functional gap in the prototype.
 
-### 6.2 Cosmos DB — `conversations` container (partition key `/conversation_id`, 90-day TTL)
+### 6.2 Cosmos DB: `conversations` container (partition key `/conversation_id`, 90-day TTL)
 
 ```json
 {
@@ -268,7 +268,7 @@ Real payments · End-customer authentication with user accounts · Multilingual 
 }
 ```
 
-### 6.3 Azure AI Search — `coffee-knowledge` index
+### 6.3 Azure AI Search: `coffee-knowledge` index
 
 | Field | Type | Attributes |
 |---|---|---|
@@ -298,8 +298,8 @@ HNSW vector profile (`m=4`, `efConstruction=400`) plus a semantic configuration 
 | NFR3 | Availability | 99% (learning project) | App Insights availability test |
 | NFR4 | Cost | < $0.01 per conversation · < $60/month infrastructure | Custom metric + Cost Management |
 | NFR5 | Cold start | < 10 s (scale from zero) | `min_replicas=0`, raise to 1 if disruptive |
-| NFR6 | Security — secrets | Zero plaintext secrets in code, images or client | `gitleaks` scan in CI |
-| NFR7 | Security — authentication | No key in a browser or mobile bundle | Architecture review |
+| NFR6 | Security: secrets | Zero plaintext secrets in code, images or client | `gitleaks` scan in CI |
+| NFR7 | Security: authentication | No key in a browser or mobile bundle | Architecture review |
 | NFR8 | Traceability | 100% of turns traced with a `conversation_id` | KQL |
 | NFR9 | Reproducibility | `azd up` on an empty subscription yields a working system | Live test on day 6 |
 | NFR10 | Code quality | Unit test coverage ≥ 60% on `src/api/core` and `agents` | `pytest --cov` in CI |
@@ -309,7 +309,7 @@ HNSW vector profile (`m=4`, `efConstruction=400`) plus a semantic configuration 
 
 ## 8. Evaluation strategy
 
-This is where the project's value concentrates — treat it as a first-class deliverable, not an add-on.
+This is where the project's value concentrates: treat it as a first-class deliverable, not an add-on.
 
 ### 8.1 Golden dataset (built on day 5, roughly 100 cases)
 
@@ -369,7 +369,7 @@ Sample 10% of live conversations → run groundedness and content safety evaluat
 
 ## 10. Observability
 
-**Traces (OpenTelemetry → Application Insights)** — one span per step, correlated by `conversation_id`:
+**Traces (OpenTelemetry → Application Insights)**: one span per step, correlated by `conversation_id`:
 `chat.request` → `guard.content_safety` → `guard.llm` → `router.classify` → `agent.details` → `search.query` → `llm.completion`.
 
 **Span attributes**: `gen_ai.system`, `gen_ai.request.model`, `gen_ai.usage.input_tokens`, `gen_ai.usage.output_tokens`, `app.conversation_id`, `app.route`, `app.cost_usd`.
@@ -422,7 +422,7 @@ Sample 10% of live conversations → run groundedness and content safety evaluat
 4. Auto-shutdown on the Azure ML compute instance (30 min idle).
 5. Tear everything down at the end: `az group delete` (or keep only AI Search on Free).
 
-> Check prices against the Azure pricing calculator for your region — they change.
+> Check prices against the Azure pricing calculator for your region: they change.
 
 ---
 

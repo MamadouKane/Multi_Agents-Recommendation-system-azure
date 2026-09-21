@@ -1,4 +1,4 @@
-# Seven-day roadmap — Merry's Way AI on Azure
+# Seven-day roadmap: Merry's Way AI on Azure
 
 Companion to [`01-requirements.md`](01-requirements.md). Each day lists an **objective**, **tasks**, **deliverables**, **acceptance criteria** and **what can be dropped**.
 
@@ -10,7 +10,7 @@ Companion to [`01-requirements.md`](01-requirements.md). Each day lists an **obj
 
 ---
 
-## Day 0 — Preparation (2 h, the day before)
+## Day 0: Preparation (2 h, the day before)
 
 > Do this before day 1. It is not development work, but skipping it costs half a day.
 
@@ -19,13 +19,13 @@ Companion to [`01-requirements.md`](01-requirements.md). Each day lists an **obj
 | 0.2 | Azure subscription                                | Active account (pay-as-you-go or student credit). Note the `subscription_id`                                                                                                 |
 | 0.3 | Local tooling                                     | `az` CLI ≥ 2.60, `azd`, Docker Desktop, Python 3.11, `uv` or `poetry`, Node 20. **`gh` CLI is not installed on this machine** → `brew install gh` (or use the GitHub web UI) |
 | 0.4 | **Request Azure OpenAI access**                   | Check model availability per region: `az cognitiveservices account list-models`. A denied quota can take 24-48 h to resolve → **this is the critical path**                  |
-| 0.5 | GitHub repository                                 | ✅ **Done** — `Multi_Agents-Recommendation-system-azure`, **public**. See the "Public repository" box below                                                                   |
+| 0.5 | GitHub repository                                 | ✅ **Done**: `Multi_Agents-Recommendation-system-azure`, **public**. See the "Public repository" box below                                                                   |
 | 0.6 | Reading                                           | Azure AI Search *hybrid search* docs, Container Apps *revisions* docs, the README of the `azd` Python + Container Apps template                                              |
 | 0.7 | 🔴 **Harden `.gitignore` before the first commit** | The repository is public, so this is a hard prerequisite. See the list below                                                                                                 |
 
-### 🔴 Public repository — precautions
+### 🔴 Public repository: precautions
 
-State as of 2026-09-18: the prototype folder **was never a Git repository** (`git rev-parse` → *not a git repository*). Consequence: **no history to clean**, no key was ever pushed. That is the best possible starting point — the job is simply not to create the problem.
+State as of 2026-09-18: the prototype folder **was never a Git repository** (`git rev-parse` → *not a git repository*). Consequence: **no history to clean**, no key was ever pushed. That is the best possible starting point: the job is simply not to create the problem.
 
 The new repository's `.gitignore` already covers `.env*`, caches, `venv/`, `node_modules/`, `.azure/` and `.DS_Store`. Key entries:
 
@@ -54,7 +54,7 @@ web-build/
 # Notebooks
 .ipynb_checkpoints/
 
-# Secrets — extra safety nets
+# Secrets: extra safety nets
 *.pem
 *.key
 *-credentials.json
@@ -62,15 +62,15 @@ serviceAccount*.json
 local.settings.json
 ```
 
-> The prototype's `python_code/venv/` weighed **650 MB** — without that rule the first `git add .` is unmanageable. Excluding it, the project is about 9 MB: fine for GitHub.
+> The prototype's `python_code/venv/` weighed **650 MB**: without that rule the first `git add .` is unmanageable. Excluding it, the project is about 9 MB: fine for GitHub.
 
 **Three rules to hold for the life of a public repository:**
 
-1. **Never `git add -f`** an ignored file, and never commit a secret "just to test". On a public repository, a secret that is pushed and then deleted must be treated as permanently compromised — bots scan GitHub continuously, within seconds.
-2. **`gitleaks` as a pre-commit hook from day 1** (task 1.5) — the automated guardrail, not human vigilance.
+1. **Never `git add -f`** an ignored file, and never commit a secret "just to test". On a public repository, a secret that is pushed and then deleted must be treated as permanently compromised: bots scan GitHub continuously, within seconds.
+2. **`gitleaks` as a pre-commit hook from day 1** (task 1.5): the automated guardrail, not human vigilance.
 3. **Enable GitHub Secret Scanning and Push Protection** under *Settings → Code security*: free on public repositories, and it blocks a push containing a recognised key.
 
-Task **0.1 (key revocation)** still stands, but for a different reason than first assumed: the keys never leaked through Git — they are simply sitting in plaintext on disk and are destined to be replaced by Key Vault + Managed Identity. Revoke them once the Azure migration makes them redundant (end of day 2 for OpenAI, Pinecone and Firebase).
+Task **0.1 (key revocation)** still stands, but for a different reason than first assumed: the keys never leaked through Git: they are simply sitting in plaintext on disk and are destined to be replaced by Key Vault + Managed Identity. Revoke them once the Azure migration makes them redundant (end of day 2 for OpenAI, Pinecone and Firebase).
 
 **Repository setup:**
 
@@ -94,11 +94,11 @@ git push -u origin main
 
 ---
 
-## Day 1 — Design, foundations, infrastructure as code
+## Day 1: Design, foundations, infrastructure as code
 
 **Objective**: an Azure foundation deployable in one command, with no plaintext secrets.
 
-### Morning — Design (3 h)
+### Morning: Design (3 h)
 
 | #   | Task                                                              | Deliverable                     |
 | --- | ----------------------------------------------------------------- | ------------------------------- |
@@ -125,7 +125,7 @@ Multi_Agents-Recommendation-system-azure/
 │  │  └─ Dockerfile
 │  ├─ data_pipelines/  ingest_catalog.py  build_index.py
 │  ├─ ml/              pipeline.yml  components/  train_apriori.py  evaluate_reco.py
-│  └─ web/             🟣 P2 — Next.js
+│  └─ web/             🟣 P2: Next.js
 ├─ evals/            datasets/  evaluators/  run_eval.py  thresholds.yaml
 ├─ tests/            unit/  integration/  smoke/
 ├─ data/raw/         catalogue, images, knowledge base, sales data
@@ -133,7 +133,7 @@ Multi_Agents-Recommendation-system-azure/
 └─ docs/             adr/  architecture.md  journal.md  model_card.md
 ```
 
-### Afternoon — Infrastructure as code (5 h)
+### Afternoon: Infrastructure as code (5 h)
 
 | #    | Task                                                                                                                     | Command / detail                                      |
 | ---- | ------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------- |
@@ -151,24 +151,24 @@ Multi_Agents-Recommendation-system-azure/
 - [ ] The placeholder Container App responds on its FQDN
 - [ ] The budget and its alerts are active
 
-**Droppable**: 1.11 and 1.12 can slip to day 6 if Bicep fights back — create the resources with `az` CLI instead and script it in `infra/bootstrap.sh`.
+**Droppable**: 1.11 and 1.12 can slip to day 6 if Bicep fights back: create the resources with `az` CLI instead and script it in `infra/bootstrap.sh`.
 
 ---
 
-## Day 2 — Data and RAG
+## Day 2: Data and RAG
 
 **Objective**: replace Pinecone and Firebase with AI Search, Cosmos DB and Blob Storage, with measurably better retrieval.
 
-### Morning — Catalogue ingestion (3 h)
+### Morning: Catalogue ingestion (3 h)
 
 | #   | Task                                                                                                       | Detail                                                                                                                                                                                                                                            |
 | --- | ---------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 2.0 | 🔴 **Settle the "Dark chocolate" case (D11)**                                                               | The menu advertises Drinking ($5.00) **and** Packaged ($3.00); the catalogue only holds Drinking. Two options: (a) create the `dark-chocolate-packaged` record and its image, (b) remove the menu line. Blocks OM4 — do this **before** ingestion |
-| 2.1 | Clean and enrich `products.jsonl`                                                                          | Add a stable `product_id`, derive `allergens` from ingredients (**US2** — Milk, Eggs, Gluten, Nuts, Soy), add `is_active`                                                                                                                         |
+| 2.0 | 🔴 **Settle the "Dark chocolate" case (D11)**                                                               | The menu advertises Drinking ($5.00) **and** Packaged ($3.00); the catalogue only holds Drinking. Two options: (a) create the `dark-chocolate-packaged` record and its image, (b) remove the menu line. Blocks OM4: do this **before** ingestion |
+| 2.1 | Clean and enrich `products.jsonl`                                                                          | Add a stable `product_id`, derive `allergens` from ingredients (**US2**: Milk, Eggs, Gluten, Nuts, Soy), add `is_active`                                                                                                                         |
 | 2.2 | `ingest_catalog.py`: upload the **18** images to Blob (`product-images`) and upsert into Cosmos `products` | Idempotent, re-runnable                                                                                                                                                                                                                           |
 | 2.3 | Enrich the knowledge base                                                                                  | Split `about_us.txt` into topical documents (hours, delivery, history, sustainability) and write 10-15 FAQ entries (payment, vegan, gluten-free, wifi, groups)                                                                                    |
 
-### Afternoon — Index and retrieval (5 h)
+### Afternoon: Index and retrieval (5 h)
 
 | #   | Task                                                                                                                                                                        | Detail                                                                           |
 | --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
@@ -176,7 +176,7 @@ Multi_Agents-Recommendation-system-azure/
 | 2.5 | Chunking: one document per product (full record), one per "about" section, one per FAQ                                                                                      | ~45 documents instead of 20                                                      |
 | 2.6 | Embeddings via Azure OpenAI, uploaded in batches                                                                                                                            |                                                                                  |
 | 2.7 | Implement `core/search.py`: **hybrid retrieval** (BM25 + vector, RRF fusion) plus **semantic reranker**, `top_k=5`, score threshold, OData filters (`doc_type`, `category`) | Clears D7                                                                        |
-| 2.8 | **Retriever mini-evaluation**: 15 questions → expected documents → measure Recall@3 and MRR, comparing three strategies (vector only / hybrid / hybrid + reranker)          | `evals/retrieval_ablation.md` — **this table is what makes the portfolio piece** |
+| 2.8 | **Retriever mini-evaluation**: 15 questions → expected documents → measure Recall@3 and MRR, comparing three strategies (vector only / hybrid / hybrid + reranker)          | `evals/retrieval_ablation.md`: **this table is what makes the portfolio piece** |
 
 **Day 2 acceptance criteria**
 - [ ] `GET /api/v1/products` returns 18 products (or 19 if the Packaged Chocolate record was created, see D11) from Cosmos with reachable Blob images
@@ -184,15 +184,15 @@ Multi_Agents-Recommendation-system-azure/
 - [ ] The ablation table shows, with numbers, that hybrid + reranker beats vector-only
 - [ ] Recall@3 ≥ 0.85 on the 15 control questions
 
-**Droppable**: the FAQ entries (2.3) can shrink to five. The ablation table is **not** droppable — it is the day's learning deliverable.
+**Droppable**: the FAQ entries (2.3) can shrink to five. The ablation table is **not** droppable: it is the day's learning deliverable.
 
 ---
 
-## Day 3 — Agent refactor
+## Day 3: Agent refactor
 
 **Objective**: robust, typed, traceable, safe agents. This is the day debts D1, D3, D4, D6, D8 and D9 get cleared.
 
-### Morning — Foundations (4 h)
+### Morning: Foundations (4 h)
 
 | #   | Task                                                                                                                                                                                          | Detail                                                                                                                |
 | --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
@@ -202,14 +202,14 @@ Multi_Agents-Recommendation-system-azure/
 | 3.4 | `app/telemetry.py`: OpenTelemetry → Application Insights, one span per step, `gen_ai.*` attributes, `conversation_id`                                                                         | Do it now: retrofitting instrumentation is painful                                                                    |
 | 3.5 | `app/main.py`: `lifespan`, dependency injection, `/api/v1` router, CORS allowlist                                                                                                             | D5, D9                                                                                                                |
 
-### Afternoon — Agents (4 h)
+### Afternoon: Agents (4 h)
 
 | #    | Task                                                                                                                                                                                                | Detail                                  |
 | ---- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------- |
-| 3.6  | **Guard** in two layers: (a) Azure AI Content Safety — text moderation and **Prompt Shields**; (b) an LLM scope guard. Every block is traced with its reason                                        | D6                                      |
+| 3.6  | **Guard** in two layers: (a) Azure AI Content Safety: text moderation and **Prompt Shields**; (b) an LLM scope guard. Every block is traced with its reason                                        | D6                                      |
 | 3.7  | **Router**: Structured Outputs, tightened prompt, keep the three-message window                                                                                                                     |                                         |
 | 3.8  | **Details (RAG)**: context injected in a **dedicated system message**, never by overwriting the user message; `doc_id` citations returned in `memory`                                               | D8                                      |
-| 3.9  | **Order**: the LLM only emits `[{product_id, quantity}]`; validation against the catalogue; **prices and totals computed in Python** (`Decimal`, rounded to 2 dp); unknown items flagged explicitly | 🔴 D1 — the heart of OM4                 |
+| 3.9  | **Order**: the LLM only emits `[{product_id, quantity}]`; validation against the catalogue; **prices and totals computed in Python** (`Decimal`, rounded to 2 dp); unknown items flagged explicitly | 🔴 D1: the heart of OM4                 |
 | 3.10 | **Recommendation**: load artefacts from Blob; canonical Apriori key (D10); **output filter** guaranteeing every recommended item exists in the catalogue                                            |                                         |
 | 3.11 | Unit tests: `resolve_product`, total computation (including edge cases), output parsing, `get_apriori_recommendation`                                                                               | ≥ 60% coverage on `core/` and `agents/` |
 
@@ -220,15 +220,15 @@ Multi_Agents-Recommendation-system-azure/
 - [ ] `pytest` is green, coverage ≥ 60%
 - [ ] Traces appear in Application Insights with the `conversation_id`
 
-**Droppable**: nothing. This is the densest and most structural day — if you must overrun, borrow from day 4.
+**Droppable**: nothing. This is the densest and most structural day: if you must overrun, borrow from day 4.
 
 ---
 
-## Day 4 — Recommender on Azure ML
+## Day 4: Recommender on Azure ML
 
 **Objective**: turn the Apriori notebook into a versioned, repeatable MLOps pipeline.
 
-### Morning — Pipeline (4 h)
+### Morning: Pipeline (4 h)
 
 | #   | Task                                                                                                                                             | Detail                     |
 | --- | ------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------- |
@@ -239,19 +239,19 @@ Multi_Agents-Recommendation-system-azure/
 | 4.5 | **MLflow**: log parameters (`min_support`, `min_lift`), metrics (rule count, mean confidence, **catalogue coverage**, median lift) and artefacts |                            |
 | 4.6 | Submit the pipeline: `az ml job create -f src/ml/pipeline.yml`                                                                                   |                            |
 
-### Afternoon — Evaluation and registration (4 h)
+### Afternoon: Evaluation and registration (4 h)
 
 | #    | Task                                                                                                                                                                                      | Detail                                                                                             |
 | ---- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| 4.7  | **Serious offline evaluation**: temporal split (first three weeks of April vs the last week), measuring Precision@5, Recall@5, coverage and diversity against a "top popularity" baseline | The original notebook evaluated **nothing** — this is the project's main data science contribution |
+| 4.7  | **Serious offline evaluation**: temporal split (first three weeks of April vs the last week), measuring Precision@5, Recall@5, coverage and diversity against a "top popularity" baseline | The original notebook evaluated **nothing**: this is the project's main data science contribution |
 | 4.8  | Sweep `min_support` (0.02 / 0.03 / 0.05 / 0.08) and compare runs in Azure ML                                                                                                              |                                                                                                    |
 | 4.9  | Register the best model in the **model registry** with tags and metrics                                                                                                                   | `coffee-reco-apriori:N`                                                                            |
-| 4.10 | Write the **model card** (data, method, metrics, limitations, biases — e.g. one month of data, three outlets, no seasonality captured)                                                    | `docs/model_card.md`                                                                               |
+| 4.10 | Write the **model card** (data, method, metrics, limitations, biases, e.g. one month of data, three outlets, no seasonality captured)                                                    | `docs/model_card.md`                                                                               |
 | 4.11 | The API loads artefacts from Blob at startup and exposes the model version on `/health`                                                                                                   | Traceability                                                                                       |
 
 **Day 4 acceptance criteria**
 - [ ] The Azure ML pipeline runs end to end and registers a model
-- [ ] A table compares Apriori against the popularity baseline on Precision@5 — **with an honest verdict** (the baseline may well win; saying so is worth more than hiding it)
+- [ ] A table compares Apriori against the popularity baseline on Precision@5: **with an honest verdict** (the baseline may well win; saying so is worth more than hiding it)
 - [ ] MLflow runs are comparable in the Azure ML UI
 - [ ] The model card is written
 - [ ] 🔴 **The Azure ML compute is stopped at end of day**
@@ -260,22 +260,22 @@ Multi_Agents-Recommendation-system-azure/
 
 ---
 
-## Day 5 — System evaluation
+## Day 5: System evaluation
 
 **Objective**: make quality measurable and regressions detectable. **The most differentiating day of the project.**
 
-### Morning — Golden dataset (4 h)
+### Morning: Golden dataset (4 h)
 
 | #   | Task                                                                                        | Detail                                                                                    |
 | --- | ------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
-| 5.1 | `evals/datasets/routing.jsonl` — 30 cases (10 per agent plus ambiguous ones)                | Generate with an LLM, **then review by hand**                                             |
-| 5.2 | `evals/datasets/rag.jsonl` — 25 questions with reference answers and expected doc IDs       | Emphasise allergens, prices, hours, delivery                                              |
-| 5.3 | `evals/datasets/orders.jsonl` — 25 multi-turn conversations with expected `order` and total | Include: off-menu item, change of mind, multiple quantities, cancellation, "nothing else" |
-| 5.4 | `evals/datasets/guard.jsonl` — 20 cases (10 legitimate, 10 hostile including 5 jailbreaks)  | Use `AdversarialSimulator` to generate, then curate                                       |
+| 5.1 | `evals/datasets/routing.jsonl`: 30 cases (10 per agent plus ambiguous ones)                | Generate with an LLM, **then review by hand**                                             |
+| 5.2 | `evals/datasets/rag.jsonl`: 25 questions with reference answers and expected doc IDs       | Emphasise allergens, prices, hours, delivery                                              |
+| 5.3 | `evals/datasets/orders.jsonl`: 25 multi-turn conversations with expected `order` and total | Include: off-menu item, change of mind, multiple quantities, cancellation, "nothing else" |
+| 5.4 | `evals/datasets/guard.jsonl`: 20 cases (10 legitimate, 10 hostile including 5 jailbreaks)  | Use `AdversarialSimulator` to generate, then curate                                       |
 
-> ⏱️ This block **always** takes longer than planned. If you overrun, cut the volumes (20/15/15/12) rather than rushing the review — a wrong golden set is worse than none.
+> ⏱️ This block **always** takes longer than planned. If you overrun, cut the volumes (20/15/15/12) rather than rushing the review: a wrong golden set is worse than none.
 
-### Afternoon — Harness and CI gate (4 h)
+### Afternoon: Harness and CI gate (4 h)
 
 | #    | Task                                                                                                                                            | Detail                        |
 | ---- | ----------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------- |
@@ -296,11 +296,11 @@ Multi_Agents-Recommendation-system-azure/
 
 ---
 
-## Day 6 — Deployment and CI/CD
+## Day 6: Deployment and CI/CD
 
 **Objective**: everything ships automatically, with rollback.
 
-### Morning — Container and deployment (4 h)
+### Morning: Container and deployment (4 h)
 
 | #   | Task                                                                                                                  | Detail         |
 | --- | --------------------------------------------------------------------------------------------------------------------- | -------------- |
@@ -310,7 +310,7 @@ Multi_Agents-Recommendation-system-azure/
 | 6.4 | Configure scaling (KEDA: HTTP concurrency, `min=0`, `max=3`), resources (0.5 vCPU / 1 GiB), probes                    |                |
 | 6.5 | Smoke tests: `/health`, plus one complete order conversation                                                          | `tests/smoke/` |
 
-### Afternoon — GitHub Actions (4 h)
+### Afternoon: GitHub Actions (4 h)
 
 | #    | Task                                                                                                                        | Detail                           |
 | ---- | --------------------------------------------------------------------------------------------------------------------------- | -------------------------------- |
@@ -329,15 +329,15 @@ Multi_Agents-Recommendation-system-azure/
 - [ ] `gitleaks` passes over the whole history
 - [ ] The reproducibility test (NFR9) passes: `azd up` on an empty resource group
 
-**Droppable**: 🟣 6.11 (`ml-train.yml`) — the Azure ML pipeline can stay manually submitted.
+**Droppable**: 🟣 6.11 (`ml-train.yml`): the Azure ML pipeline can stay manually submitted.
 
 ---
 
-## Day 7 — Monitoring, polish, documentation
+## Day 7: Monitoring, polish, documentation
 
 **Objective**: make the system observable, and the project tellable.
 
-### Morning — Observability (4 h)
+### Morning: Observability (4 h)
 
 | #   | Task                                                                                                                                           | Detail                                       |
 | --- | ---------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------- |
@@ -348,7 +348,7 @@ Multi_Agents-Recommendation-system-azure/
 | 7.5 | Application Insights availability test on `/health`                                                                                            |                                              |
 | 7.6 | 🟣 **Online evaluation**: 10% sample → groundedness + content safety asynchronously → custom metric → alert                                     | P2 but high value                            |
 
-### Afternoon — Performance, cost, documentation (4 h)
+### Afternoon: Performance, cost, documentation (4 h)
 
 | #    | Task                                                                                                                                                                                                           | Detail                                             |
 | ---- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
@@ -404,4 +404,4 @@ Multi_Agents-Recommendation-system-azure/
 5. **Private endpoints and VNet** (enterprise posture)
 6. **Prompt A/B testing** via Container Apps revisions and traffic splitting
 7. **Voice**: Azure AI Speech (STT/TTS) for spoken ordering
-8. **Blog post or video** — the real return on a portfolio project
+8. **Blog post or video**: the real return on a portfolio project

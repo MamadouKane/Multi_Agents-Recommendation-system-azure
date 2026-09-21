@@ -1,4 +1,4 @@
-# Multi-Agents Recommendation System — Azure
+# Multi-Agents Recommendation System on Azure
 
 A multi-agent conversational assistant for a coffee shop: order taking, product questions (RAG) and recommendations (market basket analysis), productionised on **Azure**.
 
@@ -55,10 +55,10 @@ azd up
 
 ## Principles
 
-- **No secrets in code, images or clients** — Managed Identity + Key Vault. The repo is public, so `gitleaks` runs pre-commit and GitHub Push Protection is enabled.
-- **The LLM never does arithmetic on money** — it extracts `[{product_id, quantity}]`; totals are computed in Python from the catalogue.
-- **The catalogue is the single source of truth** — the menu injected into prompts is rendered at runtime, never hardcoded.
-- **Every prompt change goes through evaluation** — `eval.yml` blocks the pull request on regression.
+- **No secrets in code, images or clients**: Managed Identity + Key Vault. The repo is public, so `gitleaks` runs pre-commit and GitHub Push Protection is enabled.
+- **The LLM never does arithmetic on money**: it extracts `[{product_id, quantity}]`; totals are computed in Python from the catalogue.
+- **The catalogue is the single source of truth**: the menu injected into prompts is rendered at runtime, never hardcoded.
+- **Every prompt change goes through evaluation**: `eval.yml` blocks the pull request on regression.
 
 ## Status
 
@@ -76,4 +76,4 @@ azd up
 ## Credits
 
 Original prototype: *Coffee Shop Customer Service Chatbot* tutorial.
-Dataset: [Kaggle — Coffee Shop Sample Data](https://www.kaggle.com/datasets/ylchang/coffee-shop-sample-data-1113).
+Dataset: [Kaggle: Coffee Shop Sample Data](https://www.kaggle.com/datasets/ylchang/coffee-shop-sample-data-1113).

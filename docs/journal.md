@@ -4,7 +4,7 @@ One entry per day: what got done, what is blocked, what was learned, and the cos
 
 ---
 
-## Day 0 — 2026-09-18 — Preparation
+## Day 0 (2026-09-18): Preparation
 
 **Done**
 - Created the `Multi_Agents-Recommendation-system-azure` repository (public) and its folder structure
@@ -20,8 +20,6 @@ One entry per day: what got done, what is blocked, what was learned, and the cos
 - The original vector index holds **20 documents** (18 product records + about page + menu), not 21.
 - The original folder was never a Git repository, so no key ever leaked and there is no history to rewrite.
 - In the Kaggle sales data, the name "Dark chocolate" covers product_id 19 (Packaged Chocolate) **and** 58/59 (Drinking Chocolate, once the ` Rg`/` Lg` suffixes are stripped). The legacy notebook pivots baskets by product *name*, so the legacy Apriori rules mix both products → D11 also corrupts the recommender baseline. Fix on day 4: key on `product_id`.
-- Homebrew on this Mac is the Intel (x86_64, Rosetta) install under `/usr/local`: no bottles for macOS 26 → it compiles everything from source (LLVM, hours). Azure CLI installed with `uv tool` instead.
-- `uv tool install azure-cli` silently resolved **2.0.67 (2019)**: recent `azure-cli` pins pre-release SDKs (e.g. `azure-batch>=15.0.0b1`), which uv refuses by default. Fix: `--prerelease allow`. The shipped `az` script also calls whatever `python` is on PATH (Anaconda) → replaced by a wrapper pointing at the tool's own interpreter. Lesson: always check the version actually installed.
 - `gpt-4.1-mini` (the model in the v1.1 spec) is **Legacy** (retires 2027-04-14) with batch-only quota → risk R1 materialised on day 0. `gpt-5.6-luna` is available in every EU region checked, but quota is 0 everywhere until requested.
 - GPT-5 models are reasoning models: `temperature`/`top_p` expected unsupported → to verify with a live call on day 1.
 
@@ -30,7 +28,7 @@ One entry per day: what got done, what is blocked, what was learned, and the cos
 - [x] Install the `gh` CLI and `gitleaks`
 - [ ] Wait for the `gpt-5.6-luna` quota decision (filed 2026-09-18)
 - [ ] Note the `gpt-5.6-luna` price per million tokens (input/output) from the model card
-- [ ] Enable GitHub Secret Scanning + Push Protection
-- [ ] First commit and push
+- [x] Enable GitHub Secret Scanning + Push Protection
+- [x] First commit and push (`gitleaks`: no leaks found)
 
 **Cost today**: €0
