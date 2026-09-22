@@ -1,4 +1,4 @@
-# ---- Secrets (never commit - this repo is public) ----
+# ---- Secrets  ----
 .env
 .env.*
 !.env.example
