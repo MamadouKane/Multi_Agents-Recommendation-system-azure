@@ -1,4 +1,4 @@
-.PHONY: venv install install-all lint format typecheck test cov check eval run docker ingest index train secrets clean
+.PHONY: venv install install-all lint format typecheck test cov check eval run docker ingest index train secrets clean infra-preview infra-up search-up search-down
 
 # Every target uses the project virtualenv directly: no need to `source .venv/bin/activate`.
 VENV   := .venv
@@ -53,6 +53,29 @@ index:            ## Build the Azure AI Search index (day 2)
 
 train:            ## Submit the recommendation training pipeline to Azure ML (day 4)
 	az ml job create -f src/ml/pipeline.yml
+
+RG      := rg-coffeeai-dev
+SEARCH  := srch-coffeeai-dev-frc
+
+infra-preview:    ## Preview infrastructure changes without applying them
+	az deployment group what-if -g $(RG) -f infra/main.bicep -p infra/main.parameters.json \
+		-p developerPrincipalId=$$(az ad signed-in-user show --query id -o tsv)
+
+infra-up:         ## Deploy the infrastructure
+	az deployment group create -g $(RG) -n infra-$$(date +%Y%m%d-%H%M) \
+		-f infra/main.bicep -p infra/main.parameters.json \
+		-p developerPrincipalId=$$(az ad signed-in-user show --query id -o tsv) \
+		--query properties.outputs
+
+search-up:        ## Recreate Azure AI Search for a working session (about 2 EUR per day, ADR-002)
+	az deployment group create -g $(RG) -n search-up-$$(date +%Y%m%d-%H%M) \
+		-f infra/main.bicep -p infra/main.parameters.json \
+		-p developerPrincipalId=$$(az ad signed-in-user show --query id -o tsv) \
+		-p deploySearch=true --query properties.outputs.searchEndpoint
+
+search-down:      ## Delete Azure AI Search at the end of the session. The index is rebuilt by `make index`.
+	az search service delete -g $(RG) -n $(SEARCH) --yes
+	@echo "Search deleted. Run 'make search-up' then 'make index' at the next session."
 
 secrets:          ## Scan the working tree for leaked secrets
 	gitleaks detect --source . --no-git -v
