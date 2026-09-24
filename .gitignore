@@ -45,7 +45,12 @@ evals/reports/*
 !evals/reports/baseline.json
 
 # ---- Docs (temporarily untracked: cleanup in progress, re-added at the end of the project) ----
-docs/
+# Exception: the diagram used by the README, otherwise it would not render on GitHub.
+# Git does not descend into an excluded directory, so the exclusion is written entry by entry.
+docs/*
+!docs/assets/
+docs/assets/*
+!docs/assets/archi-simplified.svg
 
 # ---- OS / IDE ----
 .DS_Store
