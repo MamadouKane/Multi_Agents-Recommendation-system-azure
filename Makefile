@@ -1,4 +1,4 @@
-.PHONY: venv install install-all lint format typecheck test cov check eval run docker ingest index train secrets clean infra-preview infra-up search-up search-down
+.PHONY: venv install install-all lint format typecheck test cov check eval run docker env catalog ingest index train secrets clean infra-preview infra-up search-up search-down
 
 # Every target uses the project virtualenv directly: no need to `source .venv/bin/activate`.
 VENV   := .venv
@@ -44,6 +44,15 @@ run:              ## Run the API locally
 
 docker:           ## Build the container image
 	docker build -t coffee-ai-api:local -f src/api/Dockerfile .
+
+env:              ## Write .env from the outputs of the last infrastructure deployment (endpoints only)
+	az deployment group show -g $(RG) \
+		-n $$(az deployment group list -g $(RG) --query "[?starts_with(name,'infra-')] | sort_by(@,&properties.timestamp)[-1].name" -o tsv) \
+		--query properties.outputs -o json | $(PYTHON) scripts/outputs_to_env.py > .env
+	@echo ".env written:" && cat .env
+
+catalog:          ## Build the validated catalogue: data/raw/products.jsonl -> data/processed/catalog.jsonl
+	$(PYTHON) -m src.data_pipelines.catalog
 
 ingest:           ## Load the catalogue into Cosmos DB and Blob Storage (day 2)
 	$(PYTHON) -m src.data_pipelines.ingest_catalog

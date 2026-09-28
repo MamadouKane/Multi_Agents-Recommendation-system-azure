@@ -42,6 +42,8 @@ exclude = ["^legacy/", "^notebooks/"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# Tests import `src.…` from the repository root.
+pythonpath = ["."]
 addopts = "-q --strict-markers"
 markers = ["integration: requires live Azure resources", "smoke: post-deployment checks"]
 
