@@ -24,7 +24,7 @@ CI/CD.
 
 ## Architecture
 
-![Cloud architecture](docs/assets/archi-simplified.svg)
+![Cloud architecture](docs/assets/archi-simplified-v2.svg)
 
 ## The five agents
 

@@ -44,3 +44,21 @@ class Product(BaseModel):
         default_factory=list, description="Other spellings customers use, for fuzzy matching."
     )
     is_active: bool = True
+
+
+DocType = Literal["product", "menu", "dietary", "about", "faq"]
+
+
+class KnowledgeDoc(BaseModel):
+    """One retrievable unit of the search index (schema in docs/01-requirements.md, section 6.3)."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    id: str = Field(pattern=r"^[a-z0-9]+(-[a-z0-9]+)*$")
+    doc_type: DocType
+    title: str = Field(min_length=1)
+    content: str = Field(min_length=1)
+    product_id: str | None = None
+    category: Category | None = None
+    price: Decimal | None = None
+    source: str = Field(description="Where the text comes from, for citations and audits.")

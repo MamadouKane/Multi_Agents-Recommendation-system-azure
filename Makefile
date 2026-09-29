@@ -1,4 +1,4 @@
-.PHONY: venv install install-all lint format typecheck test cov check eval run docker env catalog ingest index train secrets clean infra-preview infra-up search-up search-down
+.PHONY: venv install install-all lint format typecheck test cov check eval ablation run docker env catalog knowledge ingest index train secrets clean infra-preview infra-up search-up search-down
 
 # Every target uses the project virtualenv directly: no need to `source .venv/bin/activate`.
 VENV   := .venv
@@ -19,11 +19,11 @@ install-all: venv ## Install everything, including ML (day 4) and evaluation (da
 	$(BIN)/pre-commit install
 
 lint:             ## Lint with ruff
-	$(BIN)/ruff check src tests evals
+	$(BIN)/ruff check src tests evals scripts
 
 format:           ## Format and auto-fix
-	$(BIN)/ruff format src tests evals
-	$(BIN)/ruff check --fix src tests evals
+	$(BIN)/ruff format src tests evals scripts
+	$(BIN)/ruff check --fix src tests evals scripts
 
 typecheck:        ## Static type checking
 	$(BIN)/mypy src
@@ -39,6 +39,9 @@ check: lint typecheck cov   ## Everything CI verifies
 eval:             ## Golden evaluation suite (day 5)
 	$(PYTHON) evals/run_eval.py --thresholds evals/thresholds.yaml
 
+ablation:         ## Retrieval ablation: vector vs hybrid vs hybrid + reranker (ADR-002)
+	$(PYTHON) -m evals.retrieval_ablation --runs 3
+
 run:              ## Run the API locally
 	$(BIN)/uvicorn src.api.app.main:app --reload --port 8000
 
@@ -53,6 +56,9 @@ env:              ## Write .env from the outputs of the last infrastructure depl
 
 catalog:          ## Build the validated catalogue: data/raw/products.jsonl -> data/processed/catalog.jsonl
 	$(PYTHON) -m src.data_pipelines.catalog
+
+knowledge:        ## Build the search corpus: hand-written docs + docs generated from the catalogue
+	$(PYTHON) -m src.data_pipelines.knowledge
 
 ingest:           ## Load the catalogue into Cosmos DB and Blob Storage (day 2)
 	$(PYTHON) -m src.data_pipelines.ingest_catalog

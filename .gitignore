@@ -50,7 +50,7 @@ evals/reports/*
 docs/*
 !docs/assets/
 docs/assets/*
-!docs/assets/archi-simplified.svg
+!docs/assets/archi-simplified-v2.svg
 
 # ---- OS / IDE ----
 .DS_Store

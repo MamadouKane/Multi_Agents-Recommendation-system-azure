@@ -14,7 +14,7 @@ This folder is **read-only**. Transformations write to `data/processed/` (Git-ig
 
 **Sales dataset source**: [Kaggle: Coffee Shop Sample Data](https://www.kaggle.com/datasets/ylchang/coffee-shop-sample-data-1113). Kept in Git for v1 (2.9 MB); it becomes a **versioned Azure ML Data Asset** on day 4 (task 4.2).
 
-## ⚠️ Known inconsistency: "Dark chocolate" (debt D11)
+## Resolved inconsistency: "Dark chocolate" (debt D11)
 
 | Source | What it contains |
 |---|---|
@@ -24,8 +24,17 @@ This folder is **read-only**. Transformations write to `data/processed/` (Git-ig
 
 Consequences: a customer ordering "Dark chocolate" can be charged $5.00 or $3.00 depending on which source is consulted, and the recommender can suggest the Packaged variant, which has no catalogue record.
 
-**To be decided on day 2 (task 2.0), before any ingestion**: this blocks business objective OM4 (zero billing errors):
-- **(a)** create the `dark-chocolate-packaged` record ($3.00) and its image; or
-- **(b)** remove the Packaged line from the menu and from the popularity table.
+**Decided on 2026-09-28 (task 2.0): the packaged bar is out of scope.**
 
-Either way, product identifiers become explicit (`dark-chocolate-drinking`, `dark-chocolate-packaged`): the display name is never used as a key again.
+| Finding | Value |
+|---|---|
+| Packaged bar price, menu | 3.00 USD |
+| Packaged bar price, Kaggle `product.csv` (id 19) | **6.40 USD**, so even the menu price is unreliable |
+| Sales in April 2019 | drink (ids 58 and 59): 2894 units; packaged bar (id 19): **36 units, 1.2 %** |
+| Catalogue record, description, image for the bar | none |
+
+Consequences:
+- The catalogue keeps its **18 products**. The drink gets the explicit identifier `dark-chocolate-drinking`.
+- The recommender maps sales ids 58 and 59 to `dark-chocolate-drinking` and **drops id 19**. At 1.2 % of the volume it would never reach Apriori's 5 % minimum support anyway.
+- `raw/knowledge/menu_items.txt` stays untouched (this folder is read only). It is no longer a source: the menu shown to customers is rendered from the catalogue (ADR-004), so the 3.00 USD line disappears on its own.
+- Display names are never used as keys again, which also removes the legacy notebook bug that merged ids 19, 58 and 59 under one name.
