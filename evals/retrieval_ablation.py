@@ -1,4 +1,4 @@
-"""Retrieval ablation (roadmap task 2.8, ADR-002).
+"""Retrieval ablation (roadmap task 2.8: tests ADR-002, led to ADR-008).
 
 Three configurations, each adding one component to the previous one:
 
@@ -22,6 +22,7 @@ import time
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 from azure.identity import DefaultAzureCredential
 from azure.search.documents import SearchClient
@@ -45,7 +46,7 @@ class Case:
     relevant: list[str]
 
     @property
-    def off_topic(self) -> bool:
+    def unanswerable(self) -> bool:
         return not self.relevant
 
 
@@ -62,15 +63,15 @@ def load_cases(path: Path = DATASET) -> list[Case]:
 
 
 def score(result: StrategyResult, cases: list[Case]) -> dict[str, float]:
-    in_scope = [c for c in cases if not c.off_topic]
-    off_topic = [c for c in cases if c.off_topic]
+    in_scope = [c for c in cases if not c.unanswerable]
+    unanswerable = [c for c in cases if c.unanswerable]
     ids = {c.id: result.retrievals[c.id].ids for c in cases}
     return {
         "recall@1": mean([recall_at_k(ids[c.id], c.relevant, 1) for c in in_scope]),
         "recall@3": mean([recall_at_k(ids[c.id], c.relevant, 3) for c in in_scope]),
         "mrr": mean([reciprocal_rank(ids[c.id], c.relevant) for c in in_scope]),
-        # A correct abstention is an empty result on an off-topic question.
-        "abstention": mean([1.0 if not ids[c.id] else 0.0 for c in off_topic]),
+        # A correct abstention is an empty result on an unanswerable question.
+        "abstention": mean([1.0 if not ids[c.id] else 0.0 for c in unanswerable]),
         # The cost of abstaining: in-scope questions that came back empty.
         "false_abstention": mean([1.0 if not ids[c.id] else 0.0 for c in in_scope]),
         "search_p50": percentile(result.search_ms, 50),
@@ -81,8 +82,8 @@ def score(result: StrategyResult, cases: list[Case]) -> dict[str, float]:
 def threshold_sweep(result: StrategyResult, cases: list[Case]) -> list[dict[str, float]]:
     """Re-apply candidate thresholds to the semantic candidates, without new queries."""
     rows = []
-    in_scope = [c for c in cases if not c.off_topic]
-    off_topic = [c for c in cases if c.off_topic]
+    in_scope = [c for c in cases if not c.unanswerable]
+    unanswerable = [c for c in cases if c.unanswerable]
     for threshold in THRESHOLDS:
         kept = {
             c.id: [h.id for h in above_threshold(result.retrievals[c.id].candidates, threshold)]
@@ -92,11 +93,69 @@ def threshold_sweep(result: StrategyResult, cases: list[Case]) -> list[dict[str,
             {
                 "threshold": threshold,
                 "recall@3": mean([recall_at_k(kept[c.id], c.relevant, 3) for c in in_scope]),
-                "abstention": mean([1.0 if not kept[c.id] else 0.0 for c in off_topic]),
+                "abstention": mean([1.0 if not kept[c.id] else 0.0 for c in unanswerable]),
                 "false_abstention": mean([1.0 if not kept[c.id] else 0.0 for c in in_scope]),
             }
         )
     return rows
+
+
+VECTOR_GATES = [0.50, 0.55, 0.58, 0.60, 0.62, 0.65]
+
+
+def gated(
+    ranking: StrategyResult,
+    gate: dict[str, float],
+    threshold: float,
+    cases: list[Case],
+) -> dict[str, float]:
+    """Keep the ranking of one configuration, and let a separate score decide to abstain.
+
+    E and F were designed after reading the A to D results on this very dataset, so on it they
+    are hypotheses, not findings. The day 5 RAG set, never looked at, is where they are validated.
+    """
+    in_scope = [c for c in cases if not c.unanswerable]
+    unanswerable = [c for c in cases if c.unanswerable]
+    ids = {c.id: (ranking.retrievals[c.id].ids if gate[c.id] >= threshold else []) for c in cases}
+    return {
+        "threshold": threshold,
+        "recall@3": mean([recall_at_k(ids[c.id], c.relevant, 3) for c in in_scope]),
+        "mrr": mean([reciprocal_rank(ids[c.id], c.relevant) for c in in_scope]),
+        "abstention": mean([1.0 if not ids[c.id] else 0.0 for c in unanswerable]),
+        "false_abstention": mean([1.0 if not ids[c.id] else 0.0 for c in in_scope]),
+    }
+
+
+def derived_configurations(
+    results: dict[Strategy, StrategyResult], cases: list[Case]
+) -> dict[str, list[dict[str, Any]]]:
+    vector = results[Strategy.VECTOR]
+    reranked = results[Strategy.VECTOR_SEMANTIC]
+    # E: vector ranking, gate on the best reranker score among the candidates.
+    reranker_gate = {
+        c.id: max((h.reranker_score or 0.0) for h in reranked.retrievals[c.id].candidates)
+        if reranked.retrievals[c.id].candidates
+        else 0.0
+        for c in cases
+    }
+    # F: vector ranking, gate on the best vector similarity. No reranker, so no Basic tier needed.
+    vector_gate = {
+        c.id: vector.retrievals[c.id].hits[0].score if vector.retrievals[c.id].hits else 0.0
+        for c in cases
+    }
+    return {
+        "E": [gated(vector, reranker_gate, t, cases) for t in THRESHOLDS],
+        "F": [gated(vector, vector_gate, t, cases) for t in VECTOR_GATES],
+        "gate_values": [
+            {
+                "id": c.id,
+                "unanswerable": float(c.unanswerable),
+                "reranker": reranker_gate[c.id],
+                "vector": vector_gate[c.id],
+            }
+            for c in cases
+        ],
+    }
 
 
 def run(runs: int) -> tuple[list[Case], dict[Strategy, StrategyResult], list[int]]:
@@ -144,16 +203,22 @@ def render(
         Strategy.VECTOR_SEMANTIC: "D. vector + semantic reranker",
     }
     scores = {s: score(r, cases) for s, r in results.items()}
-    in_scope = [c for c in cases if not c.off_topic]
-    off_topic = [c for c in cases if c.off_topic]
+    in_scope = [c for c in cases if not c.unanswerable]
+    unanswerable = [c for c in cases if c.unanswerable]
 
     lines = [
         "# Retrieval ablation",
         "",
         f"Generated by `python -m evals.retrieval_ablation` on "
         f"{datetime.now(UTC).strftime('%Y-%m-%d %H:%M UTC')}.",
-        f"Dataset: `{DATASET}`, {len(in_scope)} in-scope questions and {len(off_topic)} off-topic "
-        f"ones. Top {TOP_K}, {runs} search run(s) per question and strategy for latency.",
+        f"Dataset: `{DATASET}`, {len(in_scope)} answerable questions and "
+        f"{len(unanswerable)} unanswerable ones.",
+        f"Top {TOP_K}, {runs} search run(s) per question and strategy for latency.",
+        "",
+        "Unanswerable questions are about the coffee shop, so the Guard lets them through, but no",
+        "document answers them (parking, phone number, caffeine content...). They replaced blatant",
+        "off-topic questions, which the Guard stops before retrieval ever runs. The retrieval gate",
+        "must say 'nothing answers this' although neighbouring documents look relevant.",
         "",
         "## Results",
         "",
@@ -201,6 +266,47 @@ def render(
                 f"| {row['false_abstention']:.0%} |"
             )
 
+    derived = derived_configurations(results, cases)
+    lines += [
+        "",
+        "## Derived configurations: rank with one signal, abstain with another",
+        "",
+        "Designed after reading the results above, on the same questions: these are hypotheses,",
+        "to be confirmed on the unseen day 5 RAG set before any decision rests on them.",
+        "",
+        "- **E**: vector ranking (A), abstain when the best reranker score is below the threshold.",
+        "- **F**: vector ranking (A), abstain when the best vector similarity is too low.",
+        "  No reranker call at all, so the Free tier of AI Search would be enough.",
+    ]
+    for name, label in (("E", "Min reranker score"), ("F", "Min vector similarity")):
+        lines += [
+            "",
+            f"### Configuration {name}",
+            "",
+            f"| {label} | Recall@3 | MRR | Correct abstention | False abstention |",
+            "|---|---|---|---|---|",
+        ]
+        for row in derived[name]:
+            lines.append(
+                f"| {row['threshold']:.2f} | {row['recall@3']:.2f} | {row['mrr']:.2f} "
+                f"| {row['abstention']:.0%} | {row['false_abstention']:.0%} |"
+            )
+
+    gates = derived["gate_values"]
+    in_scope_vector = [g["vector"] for g in gates if not g["unanswerable"]]
+    unanswerable_vector = [g["vector"] for g in gates if g["unanswerable"]]
+    lines += [
+        "",
+        "Separation of the vector gate: in-scope questions have a best similarity between "
+        f"{min(in_scope_vector):.3f} and {max(in_scope_vector):.3f}, unanswerable ones between "
+        f"{min(unanswerable_vector):.3f} and {max(unanswerable_vector):.3f}. "
+        + (
+            "The two ranges do not overlap, so a clean threshold exists."
+            if max(unanswerable_vector) < min(in_scope_vector)
+            else "The two ranges overlap, so no threshold separates them without error."
+        ),
+    ]
+
     lines += [
         "",
         "## Per question",
@@ -212,7 +318,7 @@ def render(
         cells = []
         for strategy in Strategy:
             ids = results[strategy].retrievals[case.id].ids
-            if case.off_topic:
+            if case.unanswerable:
                 cells.append("abstained" if not ids else f"{len(ids)} hits")
             else:
                 rank = next((i for i, d in enumerate(ids, 1) if d in case.relevant), None)

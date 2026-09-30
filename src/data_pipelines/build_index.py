@@ -3,7 +3,7 @@
     catalogue + data/knowledge  ->  43 documents  ->  embeddings  ->  AI Search index
 
 The index serves three retrieval strategies from one definition, which is what the day 2
-ablation compares (ADR-002):
+ablation compares (ADR-002, superseded by ADR-008):
 
 - **keyword**: BM25 on `title` and `content`, English analyzer (stemming, stop words)
 - **vector**: HNSW on `content_vector`, cosine, 1536 dimensions

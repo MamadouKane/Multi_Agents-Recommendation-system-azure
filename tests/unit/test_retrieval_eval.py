@@ -49,15 +49,15 @@ class TestDataset:
         unknown = sorted({doc for c in cases for doc in c.relevant} - corpus_ids)
         assert unknown == []
 
-    def test_off_topic_questions_expect_nothing(self, cases):
-        assert all(c.relevant == [] for c in cases if c.kind == "off_topic")
-        assert all(c.relevant for c in cases if c.kind != "off_topic")
+    def test_unanswerable_questions_expect_nothing(self, cases):
+        assert all(c.relevant == [] for c in cases if c.kind == "unanswerable")
+        assert all(c.relevant for c in cases if c.kind != "unanswerable")
 
     def test_every_question_family_is_represented(self, cases):
         kinds = {c.kind for c in cases}
-        assert {"allergen", "lexical", "keyword", "shop", "policy", "menu", "off_topic"} <= kinds
+        assert {"allergen", "lexical", "keyword", "shop", "policy", "menu", "unanswerable"} <= kinds
 
-    def test_forty_questions_with_eight_off_topic(self, cases):
+    def test_forty_questions_with_eight_unanswerable(self, cases):
         # Each in-scope question weighs about 3 points of recall: small enough to read a trend.
         assert len(cases) == 40
-        assert sum(c.off_topic for c in cases) == 8
+        assert sum(c.unanswerable for c in cases) == 8

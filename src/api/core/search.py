@@ -1,4 +1,4 @@
-"""Retrieval over the `coffee-knowledge` index (roadmap task 2.7, ADR-002).
+"""Retrieval over the `coffee-knowledge` index (roadmap task 2.7, ADR-008).
 
 Four strategies share one entry point, so the day 2 ablation and the details agent run exactly
 the same code:
@@ -46,7 +46,9 @@ class Strategy(StrEnum):
 VECTOR_CANDIDATES = 50
 SEMANTIC_CONFIGURATION = "default"
 SELECT = ["id", "doc_type", "title", "content", "product_id", "category", "source"]
-DEFAULT_MIN_RERANKER_SCORE = 1.5  # calibrated by the ablation, see evals/retrieval_ablation.md
+DEFAULT_MIN_RERANKER_SCORE = (
+    1.7  # ADR-008: between unanswerable (max 1.68) and answerable (min 1.77)
+)
 
 
 class SearchBackend(Protocol):
