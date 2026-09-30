@@ -22,6 +22,7 @@ MAPPING = {
     "storageBlobEndpoint": "AZURE_STORAGE_BLOB_ENDPOINT",
     "keyVaultUri": "AZURE_KEY_VAULT_URI",
     "apiUrl": "API_URL",
+    "appInsightsConnectionString": "APPLICATIONINSIGHTS_CONNECTION_STRING",
 }
 
 

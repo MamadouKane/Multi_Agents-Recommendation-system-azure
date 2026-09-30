@@ -20,8 +20,10 @@ from typing import Any, Literal, Protocol
 
 import httpx
 from azure.ai.contentsafety.models import AnalyzeTextOptions
+from opentelemetry.trace import SpanKind
 
 from src.api.core.llm import BearerToken
+from src.api.core.tracing import tracer
 
 PROMPT_SHIELDS_API_VERSION = "2024-09-01"  # the preview versions are not served in France Central
 MODERATION_BLOCK_SEVERITY = 2
@@ -58,6 +60,18 @@ class ContentSafetyGate:
         self._http = http or httpx.Client(timeout=10.0)
 
     def check(self, text: str) -> SafetyVerdict:
+        with tracer.start_as_current_span("content_safety", kind=SpanKind.CLIENT) as span:
+            verdict = self._check(text)
+            span.set_attributes(
+                {
+                    "content_safety.blocked": verdict.blocked,
+                    "content_safety.check": verdict.check,
+                    "content_safety.category": verdict.category,
+                }
+            )
+            return verdict
+
+    def _check(self, text: str) -> SafetyVerdict:
         started = time.perf_counter()
         text = text[:MAX_TEXT_LENGTH]
 

@@ -60,6 +60,8 @@ module monitoring 'modules/monitoring.bicep' = {
     tags: tags
     retentionInDays: logRetentionInDays
     dailyQuotaGb: logDailyQuotaGb
+    appPrincipalId: identity.outputs.principalId
+    developerPrincipalId: developerPrincipalId
   }
 }
 
@@ -165,6 +167,9 @@ output logAnalyticsWorkspaceId string = monitoring.outputs.workspaceId
 
 @description('Name of the Application Insights component.')
 output appInsightsName string = monitoring.outputs.appInsightsName
+
+@description('Where the API sends telemetry. Writing still requires an Entra ID identity.')
+output appInsightsConnectionString string = monitoring.outputs.connectionString
 
 @description('Resource id of the user-assigned managed identity, attached to the Container App later.')
 output managedIdentityId string = identity.outputs.id

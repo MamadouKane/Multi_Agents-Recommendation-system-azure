@@ -25,6 +25,7 @@ from src.api.agents.router import Router
 from src.api.core.llm import LLMContentFilterError, Usage
 from src.api.core.recommender import Recommender
 from src.api.core.schemas import AgentName, ChatMessage
+from src.api.core.tracing import tracer
 
 UPSELL_ITEMS = 2
 
@@ -59,6 +60,24 @@ class Assistant:
         self._recommender = recommender
 
     def respond(self, messages: Sequence[ChatMessage]) -> Turn:
+        """One traced turn: `chat.turn`, with one child span per step."""
+        with tracer.start_as_current_span("chat.turn") as span:
+            turn = self._respond(messages)
+            span.set_attributes(
+                {
+                    "chat.agent": turn.agent,
+                    "chat.route": turn.route or "",
+                    "guard.allowed": turn.guard.allowed,
+                    "guard.reason": turn.guard.reason,
+                    "guard.layer": turn.guard.layer,
+                    "gen_ai.usage.input_tokens": turn.usage.input_tokens,
+                    "gen_ai.usage.output_tokens": turn.usage.output_tokens,
+                    "chat.upsell": turn.trace.get("upsell", []),
+                }
+            )
+            return turn
+
+    def _respond(self, messages: Sequence[ChatMessage]) -> Turn:
         started = time.perf_counter()
         order, _ = previous_order(messages)
         carried = {
@@ -66,13 +85,18 @@ class Assistant:
             "upsell_offered": upsell_offered(messages),
         }
 
-        guard = self._guard.check(messages)
+        with tracer.start_as_current_span("guard") as span:
+            guard = self._guard.check(messages)
+            span.set_attributes({"guard.allowed": guard.allowed, "guard.layer": guard.layer})
         if not guard.allowed:
             return self.refuse(carried, guard, started)
 
         try:
-            route = self._router.route(messages)
-            reply = self._agents[route.route].answer(messages)
+            with tracer.start_as_current_span("router") as span:
+                route = self._router.route(messages)
+                span.set_attribute("chat.route", route.route)
+            with tracer.start_as_current_span(f"agent {route.route}"):
+                reply = self._agents[route.route].answer(messages)
         except LLMContentFilterError:
             # The deployment's filter can also fire after the guard, on the router or an agent.
             blocked = GuardOutcome(False, "unsafe", "model_filter")

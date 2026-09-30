@@ -23,8 +23,10 @@ from enum import StrEnum
 from typing import Any, Protocol, get_args
 
 from azure.search.documents.models import VectorizedQuery
+from opentelemetry.trace import SpanKind
 
 from src.api.core.schemas import Category, DocType
+from src.api.core.tracing import tracer
 
 Embed = Callable[[str], list[float]]
 
@@ -199,6 +201,33 @@ class Retriever:
         vector: Sequence[float] | None = None,
     ) -> Retrieval:
         """`vector` lets a caller embed once and compare strategies on the very same input."""
+        # The span NFR2 is measured on (p95 < 300 ms). The question itself is not recorded.
+        with tracer.start_as_current_span("search.query", kind=SpanKind.CLIENT) as span:
+            retrieval = self._search(query, strategy, top_k, doc_types, category, vector)
+            span.set_attributes(
+                {
+                    "search.strategy": strategy.value,
+                    "search.top_k": top_k,
+                    "search.candidates": len(retrieval.candidates),
+                    "search.hits": len(retrieval.hits),
+                    "search.best_reranker_score": retrieval.best_reranker_score,
+                    "search.abstained": retrieval.found_nothing_relevant,
+                    "search.embed_ms": retrieval.embed_ms,
+                    "search.search_ms": retrieval.search_ms,
+                    "search.document_ids": retrieval.ids,
+                }
+            )
+            return retrieval
+
+    def _search(
+        self,
+        query: str,
+        strategy: Strategy = Strategy.HYBRID_SEMANTIC,
+        top_k: int = 5,
+        doc_types: Sequence[DocType] | None = None,
+        category: Category | None = None,
+        vector: Sequence[float] | None = None,
+    ) -> Retrieval:
         if not query.strip():
             raise ValueError("empty query")
 

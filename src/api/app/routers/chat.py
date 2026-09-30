@@ -11,14 +11,17 @@ import httpx
 import openai
 from azure.core.exceptions import AzureError
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from opentelemetry import trace
 
 from src.api.agents.assistant import Turn
 from src.api.app.contracts import ChatRequest, ChatResponse
 from src.api.app.dependencies import get_services
 from src.api.app.services import Services
+from src.api.app.telemetry import record_turn
 from src.api.core.conversations import GuardRecord, Tokens, TurnRecord, now, scrub
 from src.api.core.llm import LLMError
 from src.api.core.schemas import ChatMessage
+from src.api.core.tracing import CONVERSATION_ID, conversation
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["chat"])
@@ -39,14 +42,18 @@ def chat(
 
     conversation_id = body.conversation_id or new_conversation_id()
     history = cap_history(body.messages, services.settings.max_history_turns)
-    try:
-        turn = services.assistant.respond(history)
-    except UPSTREAM_ERRORS:
-        logger.exception("turn failed", extra={"conversation_id": conversation_id})
-        raise HTTPException(status_code=503, detail=UNAVAILABLE) from None
+    # The request span already exists: tag it here, the processor tags every span below it.
+    trace.get_current_span().set_attribute(CONVERSATION_ID, conversation_id)
+    with conversation(conversation_id):
+        try:
+            turn = services.assistant.respond(history)
+        except UPSTREAM_ERRORS:
+            logger.exception("turn failed", extra={"conversation_id": conversation_id})
+            raise HTTPException(status_code=503, detail=UNAVAILABLE) from None
 
-    # Runs after the response is sent: the customer never waits for Cosmos.
     record = to_record(conversation_id, body.messages, turn, services)
+    record_turn(turn, record.cost_usd, services.catalog)
+    # Runs after the response is sent: the customer never waits for Cosmos.
     background.add_task(services.conversations.save, record)
 
     return ChatResponse(

@@ -17,6 +17,7 @@ from src.api.app.contracts import Health
 from src.api.app.dependencies import get_services
 from src.api.app.routers import chat, products
 from src.api.app.services import Services, build_services
+from src.api.app.telemetry import configure_telemetry
 from src.api.core.settings import Settings, get_settings
 
 
@@ -25,6 +26,8 @@ def create_app(
     build: Callable[[Settings], Services] = build_services,
 ) -> FastAPI:
     settings = settings or get_settings()
+    # Before FastAPI() is created: the FastAPI instrumentation patches the class.
+    configure_telemetry(settings)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:

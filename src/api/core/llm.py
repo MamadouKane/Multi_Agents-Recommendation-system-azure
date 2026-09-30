@@ -11,13 +11,15 @@ accounting for cost and tracing.
 from __future__ import annotations
 
 import time
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Iterator, Sequence
+from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Any, Generic, Literal, TypeVar
 
 import openai
 from azure.core.credentials import AccessToken, TokenCredential
 from openai import OpenAI
+from opentelemetry.trace import Span, SpanKind
 from pydantic import BaseModel
 from tenacity import (
     Retrying,
@@ -26,7 +28,11 @@ from tenacity import (
     wait_exponential_jitter,
 )
 
+from src.api.core.tracing import tracer
+
 COGNITIVE_SCOPE = "https://cognitiveservices.azure.com/.default"
+# OpenTelemetry GenAI semantic conventions: the value for Azure OpenAI.
+GEN_AI_PROVIDER = "azure.ai.openai"
 REFRESH_MARGIN_SECONDS = 300
 
 
@@ -77,10 +83,22 @@ class Embedder:
         return self.many([text])[0]
 
     def many(self, texts: Sequence[str]) -> list[list[float]]:
-        response = self._factory.client().embeddings.create(
-            model=self._deployment, input=list(texts)
-        )
-        return [item.embedding for item in response.data]
+        with tracer.start_as_current_span(
+            f"embeddings {self._deployment}", kind=SpanKind.CLIENT
+        ) as span:
+            span.set_attributes(
+                {
+                    "gen_ai.operation.name": "embeddings",
+                    "gen_ai.provider.name": GEN_AI_PROVIDER,
+                    "gen_ai.request.model": self._deployment,
+                }
+            )
+            response = self._factory.client().embeddings.create(
+                model=self._deployment, input=list(texts)
+            )
+            if response.usage is not None:
+                span.set_attribute("gen_ai.usage.input_tokens", response.usage.prompt_tokens)
+            return [item.embedding for item in response.data]
 
 
 # ---- Chat completions --------------------------------------------------------------------------
@@ -218,62 +236,100 @@ class ChatClient:
         self, messages: list[Message], schema: type[T], sampling: Sampling = DECISION
     ) -> ChatResult[T]:
         """A decision validated against `schema`: never a string to parse by hand."""
-        started = time.perf_counter()
-        try:
-            response = self._retrying(
-                lambda: self._factory.client().chat.completions.parse(
-                    model=self._deployment,
-                    messages=messages,  # type: ignore[arg-type]
-                    response_format=schema,
-                    timeout=self._timeout_s,
-                    **sampling.kwargs(),
+        with self.span(sampling, output=schema.__name__) as span:
+            started = time.perf_counter()
+            try:
+                response = self._retrying(
+                    lambda: self._factory.client().chat.completions.parse(
+                        model=self._deployment,
+                        messages=messages,  # type: ignore[arg-type]
+                        response_format=schema,
+                        timeout=self._timeout_s,
+                        **sampling.kwargs(),
+                    )
                 )
-            )
-        except openai.LengthFinishReasonError as exc:
-            raise LLMTruncatedError(f"{schema.__name__}: token limit reached") from exc
-        except openai.ContentFilterFinishReasonError as exc:
-            raise LLMContentFilterError(f"{schema.__name__}: answer filtered") from exc
-        except openai.BadRequestError as exc:
-            if is_content_filter(exc):
-                raise LLMContentFilterError(f"{schema.__name__}: prompt filtered") from exc
-            raise
+            except openai.LengthFinishReasonError as exc:
+                raise LLMTruncatedError(f"{schema.__name__}: token limit reached") from exc
+            except openai.ContentFilterFinishReasonError as exc:
+                raise LLMContentFilterError(f"{schema.__name__}: answer filtered") from exc
+            except openai.BadRequestError as exc:
+                if is_content_filter(exc):
+                    raise LLMContentFilterError(f"{schema.__name__}: prompt filtered") from exc
+                raise
 
-        message = response.choices[0].message
-        if message.refusal:
-            raise LLMRefusalError(message.refusal)
-        if message.parsed is None:
-            raise LLMError(f"{schema.__name__}: no parsed output")
-        return ChatResult(
-            value=message.parsed,
-            usage=usage_of(response),
-            latency_ms=int((time.perf_counter() - started) * 1000),
-            model=response.model,
-        )
+            message = response.choices[0].message
+            if message.refusal:
+                raise LLMRefusalError(message.refusal)
+            if message.parsed is None:
+                raise LLMError(f"{schema.__name__}: no parsed output")
+            result = ChatResult(
+                value=message.parsed,
+                usage=usage_of(response),
+                latency_ms=int((time.perf_counter() - started) * 1000),
+                model=response.model,
+            )
+            record_response(span, result.usage, result.model, response.choices[0].finish_reason)
+            return result
 
     def text(self, messages: list[Message], sampling: Sampling = PROSE) -> TextResult:
         """Free text, for the answers the customer reads."""
-        started = time.perf_counter()
-        try:
-            response = self._retrying(
-                lambda: self._factory.client().chat.completions.create(
-                    model=self._deployment,
-                    messages=messages,  # type: ignore[arg-type]
-                    timeout=self._timeout_s,
-                    **sampling.kwargs(),
+        with self.span(sampling, output="text") as span:
+            started = time.perf_counter()
+            try:
+                response = self._retrying(
+                    lambda: self._factory.client().chat.completions.create(
+                        model=self._deployment,
+                        messages=messages,  # type: ignore[arg-type]
+                        timeout=self._timeout_s,
+                        **sampling.kwargs(),
+                    )
                 )
+            except openai.BadRequestError as exc:
+                if is_content_filter(exc):
+                    raise LLMContentFilterError("text: prompt filtered") from exc
+                raise
+            choice = response.choices[0]
+            if choice.finish_reason == "length":
+                raise LLMTruncatedError("text: token limit reached")
+            if choice.finish_reason == "content_filter":
+                raise LLMContentFilterError("text: answer filtered")
+            result = TextResult(
+                text=(choice.message.content or "").strip(),
+                usage=usage_of(response),
+                latency_ms=int((time.perf_counter() - started) * 1000),
+                model=response.model,
             )
-        except openai.BadRequestError as exc:
-            if is_content_filter(exc):
-                raise LLMContentFilterError("text: prompt filtered") from exc
-            raise
-        choice = response.choices[0]
-        if choice.finish_reason == "length":
-            raise LLMTruncatedError("text: token limit reached")
-        if choice.finish_reason == "content_filter":
-            raise LLMContentFilterError("text: answer filtered")
-        return TextResult(
-            text=(choice.message.content or "").strip(),
-            usage=usage_of(response),
-            latency_ms=int((time.perf_counter() - started) * 1000),
-            model=response.model,
-        )
+            record_response(span, result.usage, result.model, choice.finish_reason)
+            return result
+
+    @contextmanager
+    def span(self, sampling: Sampling, output: str) -> Iterator[Span]:
+        """One CLIENT span per model call, retries included, named as the conventions ask."""
+        with tracer.start_as_current_span(f"chat {self._deployment}", kind=SpanKind.CLIENT) as span:
+            span.set_attributes(
+                {
+                    "gen_ai.operation.name": "chat",
+                    "gen_ai.provider.name": GEN_AI_PROVIDER,
+                    "gen_ai.request.model": self._deployment,
+                    "gen_ai.request.max_tokens": sampling.max_completion_tokens,
+                    "gen_ai.output.type": "json" if output != "text" else "text",
+                    "app.llm.output_schema": output,
+                }
+            )
+            if sampling.temperature is not None:
+                span.set_attribute("gen_ai.request.temperature", sampling.temperature)
+            if sampling.reasoning_effort is not None:
+                span.set_attribute("app.llm.reasoning_effort", sampling.reasoning_effort)
+            yield span
+
+
+def record_response(span: Span, usage: Usage, model: str, finish_reason: str | None) -> None:
+    span.set_attributes(
+        {
+            "gen_ai.response.model": model,
+            "gen_ai.usage.input_tokens": usage.input_tokens,
+            "gen_ai.usage.output_tokens": usage.output_tokens,
+            "app.llm.reasoning_tokens": usage.reasoning_tokens,
+            "gen_ai.response.finish_reasons": [finish_reason or "unknown"],
+        }
+    )

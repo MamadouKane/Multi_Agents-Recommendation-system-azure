@@ -54,6 +54,11 @@ class Settings(BaseSettings):
         default=Decimal("4.50"), alias="CHAT_OUTPUT_USD_PER_MILLION"
     )
 
+    # Names the Application Insights resource; writing requires an Entra ID identity.
+    applicationinsights_connection_string: str = Field(
+        default="", alias="APPLICATIONINSIGHTS_CONNECTION_STRING"
+    )
+
     # Comma separated. Never "*": the prototype's wildcard was debt D5.
     cors_allowed_origins: str = Field(default="http://localhost:3000", alias="CORS_ALLOWED_ORIGINS")
     # A turn is one user message and one answer (ADR-005).
