@@ -6,7 +6,9 @@ Locally, `make env` writes `.env` from the deployment outputs. The code is the s
 
 from __future__ import annotations
 
+from decimal import Decimal
 from functools import lru_cache
+from pathlib import Path
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -34,6 +36,37 @@ class Settings(BaseSettings):
 
     azure_storage_blob_endpoint: str = Field(default="", alias="AZURE_STORAGE_BLOB_ENDPOINT")
     images_container: str = Field(default="product-images", alias="AZURE_STORAGE_IMAGES_CONTAINER")
+
+    cosmos_conversations_container: str = Field(
+        default="conversations", alias="AZURE_COSMOS_CONVERSATIONS_CONTAINER"
+    )
+    # Content Safety is served by the same AI Services account as the models.
+    azure_content_safety_endpoint: str = Field(default="", alias="AZURE_CONTENT_SAFETY_ENDPOINT")
+    recommendations_path: Path = Field(
+        default=Path("data/processed/recommendations.json"), alias="RECOMMENDATIONS_PATH"
+    )
+
+    # USD per million tokens. OpenAI list prices on 2026-09-30, to confirm for Data Zone EU.
+    chat_input_usd_per_million: Decimal = Field(
+        default=Decimal("0.75"), alias="CHAT_INPUT_USD_PER_MILLION"
+    )
+    chat_output_usd_per_million: Decimal = Field(
+        default=Decimal("4.50"), alias="CHAT_OUTPUT_USD_PER_MILLION"
+    )
+
+    # Comma separated. Never "*": the prototype's wildcard was debt D5.
+    cors_allowed_origins: str = Field(default="http://localhost:3000", alias="CORS_ALLOWED_ORIGINS")
+    # A turn is one user message and one answer (ADR-005).
+    max_history_turns: int = Field(default=20, ge=1, le=50, alias="MAX_HISTORY_TURNS")
+    app_version: str = Field(default="0.1.0", alias="APP_VERSION")
+
+    @property
+    def cors_origins(self) -> list[str]:
+        return [o.strip() for o in self.cors_allowed_origins.split(",") if o.strip() and o != "*"]
+
+    @property
+    def content_safety_endpoint(self) -> str:
+        return self.azure_content_safety_endpoint or self.azure_openai_endpoint
 
     def require(self, *names: str) -> None:
         """Fail early, with the variable names, instead of on the first network call."""

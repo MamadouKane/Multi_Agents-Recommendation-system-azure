@@ -1,0 +1,104 @@
+"""Everything the API needs, built once at startup (lifespan) and shared by every request.
+
+Built here and nowhere else, so a test can hand the app fakes instead: `create_app(build=...)`.
+Every client authenticates with Entra ID: `DefaultAzureCredential` is the managed identity in the
+Container App and `az login` on a laptop. No key anywhere.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Any, Protocol
+
+from azure.ai.contentsafety import ContentSafetyClient
+from azure.cosmos import CosmosClient
+from azure.identity import DefaultAzureCredential
+from azure.search.documents import SearchClient
+from azure.storage.blob import BlobServiceClient
+
+from src.api.agents.assistant import Assistant
+from src.api.agents.details import Details
+from src.api.agents.guard import Guard
+from src.api.agents.order import Order
+from src.api.agents.recommendation import Recommendation
+from src.api.agents.router import Router
+from src.api.core.catalog import Catalog
+from src.api.core.content_safety import ContentSafetyGate
+from src.api.core.conversations import ConversationStore
+from src.api.core.cost import ModelPrice
+from src.api.core.llm import AzureOpenAIClientFactory, BearerToken, ChatClient, Embedder
+from src.api.core.recommender import RecommendationArtifacts, Recommender
+from src.api.core.search import Retriever
+from src.api.core.settings import Settings
+
+
+class ImageStore(Protocol):
+    def read(self, name: str) -> bytes: ...
+
+
+class BlobImageStore:
+    def __init__(self, service: BlobServiceClient, container: str) -> None:
+        self._container = service.get_container_client(container)
+
+    def read(self, name: str) -> bytes:
+        data: Any = self._container.download_blob(name).readall()
+        return bytes(data)
+
+
+@dataclass(frozen=True)
+class Services:
+    settings: Settings
+    assistant: Assistant
+    catalog: Catalog
+    images: ImageStore
+    conversations: ConversationStore
+    price: ModelPrice
+
+
+def build_services(settings: Settings) -> Services:
+    settings.require(
+        "azure_openai_endpoint",
+        "azure_cosmos_endpoint",
+        "azure_search_endpoint",
+        "azure_storage_blob_endpoint",
+    )
+    credential = DefaultAzureCredential()
+
+    factory = AzureOpenAIClientFactory(settings.azure_openai_endpoint, credential)
+    chat = ChatClient(factory, settings.azure_openai_chat_deployment)
+    embedder = Embedder(factory, settings.azure_openai_embedding_deployment)
+
+    database = CosmosClient(settings.azure_cosmos_endpoint, credential).get_database_client(
+        settings.azure_cosmos_database
+    )
+    catalog = Catalog.from_cosmos(database.get_container_client(settings.cosmos_products_container))
+
+    safety_endpoint = settings.content_safety_endpoint
+    safety = ContentSafetyGate(
+        safety_endpoint, ContentSafetyClient(safety_endpoint, credential), BearerToken(credential)
+    )
+    retriever = Retriever(
+        SearchClient(settings.azure_search_endpoint, settings.azure_search_index, credential),
+        embedder,
+    )
+    recommender = Recommender(RecommendationArtifacts.load(settings.recommendations_path), catalog)
+
+    assistant = Assistant(
+        guard=Guard(safety, chat),
+        router=Router(chat),
+        agents={
+            "details": Details(retriever, chat, catalog),
+            "order": Order(chat, catalog),
+            "recommendation": Recommendation(chat, catalog, recommender),
+        },
+        recommender=recommender,
+    )
+    images = BlobImageStore(
+        BlobServiceClient(settings.azure_storage_blob_endpoint, credential),
+        settings.images_container,
+    )
+    conversations = ConversationStore(
+        database.get_container_client(settings.cosmos_conversations_container)
+    )
+    price = ModelPrice(settings.chat_input_usd_per_million, settings.chat_output_usd_per_million)
+    return Services(settings, assistant, catalog, images, conversations, price)

@@ -41,10 +41,15 @@ Return the whole order after the customer's latest message:
 - Use only identifiers from the menu. The quantity is 1 unless the customer says otherwise.
 - A name that matches several menu items, such as "a scone" or "a biscotti": do not choose, put
   the customer's words in `ambiguous`.
-- Anything that is not on the menu: put the customer's words in `unrecognised`.
+- A food or drink the customer wants that is not on the menu: put its name in `unrecognised`.
+  Leave out everything that is not an item, such as a request about the receipt, delivery or
+  payment, a question, or small talk.
 - `customer_done` is true when the customer wants nothing else ("that's all", "no thanks") or
   confirms the order.
 """
+
+# The question closing an open order. The orchestrator may replace it with an upsell.
+FOLLOW_UP = "Would you like anything else?"
 
 # Customer words are echoed back in the answer: keep them short.
 MAX_ECHO_LENGTH = 40
@@ -94,7 +99,7 @@ class Order:
         return AgentReply(
             "order",
             content,
-            memory=memory.model_dump(mode="json"),
+            memory={"order": memory.model_dump(mode="json")},
             usage=result.usage,
             trace={
                 "extraction": extraction.model_dump(mode="json"),
@@ -111,6 +116,7 @@ class Order:
                 ],
                 "order_total": str(order.total),
                 "status": memory.status,
+                "awaiting_choice": bool(checked.choices),
             },
         )
 
@@ -146,12 +152,12 @@ class Order:
 
 
 def previous_order(messages: Sequence[ChatMessage]) -> tuple[OrderMemory, bool]:
-    """The open basket from the last order turn, and whether its memory had to be rejected."""
+    """The open basket carried by the last assistant message, and whether it had to be rejected."""
     for message in reversed(messages):
         memory = message.memory or {}
-        if message.role == "assistant" and memory.get("agent") == "order":
+        if message.role == "assistant" and "order" in memory:
             try:
-                previous = OrderMemory.model_validate(memory)
+                previous = OrderMemory.model_validate(memory["order"])
             except ValidationError:
                 # Tampered or corrupted: start again rather than bill something unverified.
                 return OrderMemory(), True
@@ -173,7 +179,7 @@ def compose(order: PricedOrder, checked: Checked, closed: bool, had_items: bool,
     if closed:
         parts.append(f"Thank you! Your order is confirmed:\n{order.receipt()}")
     elif not order.is_empty:
-        follow_up = "" if checked.choices else "\nWould you like anything else?"
+        follow_up = "" if checked.choices else f"\n{FOLLOW_UP}"
         parts.append(f"Here is your order so far:\n{order.receipt()}{follow_up}")
     elif had_items:
         parts.append("Your order has been cancelled.")

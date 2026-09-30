@@ -69,7 +69,7 @@ def test_an_empty_basket_request_uses_the_current_order(catalog, recommender):
         ChatMessage(
             role="assistant",
             content="...",
-            memory={"agent": "order", "items": [{"product_id": "croissant", "quantity": 1}]},
+            memory={"order": {"items": [{"product_id": "croissant", "quantity": 1}]}},
         ),
         ChatMessage(role="user", content="what goes well with my order?"),
     ]

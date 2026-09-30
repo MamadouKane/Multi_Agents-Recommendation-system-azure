@@ -9,7 +9,7 @@ from __future__ import annotations
 from decimal import Decimal
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 # EU list of major allergens, restricted to the ones this menu can contain.
 Allergen = Literal["milk", "eggs", "gluten", "tree_nuts", "soy"]
@@ -125,12 +125,13 @@ class OrderExtraction(BaseModel):
 
 
 class OrderMemory(BaseModel):
-    """The order state the client sends back on every turn (ADR-005). Untrusted: only identifiers
-    and quantities are kept, so a forged price has nowhere to go and every total is recomputed."""
+    """The order state the client sends back on every turn, under `memory.order` (ADR-005).
+    Untrusted: only identifiers and quantities are kept, so a forged price has nowhere to go and
+    every total is recomputed. Every assistant message carries it forward, whichever agent
+    answered, so the basket survives questions in between and the history cap."""
 
     model_config = ConfigDict(extra="forbid")
 
-    agent: Literal["order"] = "order"
     items: list[OrderLineRequest] = Field(default_factory=list, max_length=30)
     status: Literal["open", "closed"] = "open"
 
@@ -148,6 +149,7 @@ class RecommendationRequest(BaseModel):
 # ---- Conversation ------------------------------------------------------------------------------
 
 MAX_MESSAGE_LENGTH = 2000
+MAX_ASSISTANT_MESSAGE_LENGTH = 8000
 
 
 class ChatMessage(BaseModel):
@@ -160,5 +162,13 @@ class ChatMessage(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     role: Literal["user", "assistant"]
-    content: str = Field(max_length=MAX_MESSAGE_LENGTH)
+    content: str = Field(max_length=MAX_ASSISTANT_MESSAGE_LENGTH)
     memory: dict[str, Any] | None = None
+
+    @model_validator(mode="after")
+    def user_messages_stay_short(self) -> ChatMessage:
+        # The assistant's own answers come back too (a long receipt), so only user text is capped
+        # at the tighter limit: it is what reaches the models and Content Safety.
+        if self.role == "user" and len(self.content) > MAX_MESSAGE_LENGTH:
+            raise ValueError(f"a user message is limited to {MAX_MESSAGE_LENGTH} characters")
+        return self

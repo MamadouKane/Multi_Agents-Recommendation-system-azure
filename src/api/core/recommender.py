@@ -54,14 +54,31 @@ class Recommender:
     def source(self) -> str:
         return self._artifacts.source
 
-    def for_basket(self, product_ids: Iterable[str], top_k: int = DEFAULT_TOP_K) -> list[Product]:
-        """What customers who bought these items also bought, best confidence first."""
+    def for_basket(
+        self,
+        product_ids: Iterable[str],
+        top_k: int = DEFAULT_TOP_K,
+        complements_only: bool = False,
+    ) -> list[Product]:
+        """What customers who bought these items also bought, best confidence first.
+
+        `complements_only` leaves out the categories already in the basket: someone holding a
+        latte is offered a syrup or a pastry, not a cappuccino. The rules alone cannot tell a
+        complement from a substitute, since both are often bought together.
+        """
         basket = set(product_ids)
         best: dict[str, float] = {}
         for product_id in basket:
             for rule in self._artifacts.rules.get(product_id, []):
                 best[rule.product_id] = max(best.get(rule.product_id, 0.0), rule.confidence)
         ranked = sorted(best, key=lambda pid: (-best[pid], pid))
+        if complements_only:
+            held = {p.category for pid in basket if (p := self._catalog.get(pid)) is not None}
+            ranked = [
+                pid
+                for pid in ranked
+                if (p := self._catalog.get(pid)) is not None and p.category not in held
+            ]
         return self.serve(ranked, exclude=basket, top_k=top_k)
 
     def popular(
