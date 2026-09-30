@@ -36,6 +36,9 @@ DATASET = Path("evals/datasets/retrieval.jsonl")
 REPORT = Path("evals/retrieval_ablation.md")
 TOP_K = 5
 THRESHOLDS = [0.0, 1.0, 1.5, 2.0, 2.5]
+# The four strategies compared on day 2. VECTOR_GATED is their outcome (ADR-008), measured here as
+# the derived configuration E, so it is not a column of its own.
+ABLATED = (Strategy.VECTOR, Strategy.HYBRID, Strategy.HYBRID_SEMANTIC, Strategy.VECTOR_SEMANTIC)
 
 
 @dataclass
@@ -174,12 +177,12 @@ def run(runs: int) -> tuple[list[Case], dict[Strategy, StrategyResult], list[int
     retriever.search("warm up", Strategy.HYBRID_SEMANTIC)
 
     embed_ms: list[int] = []
-    results = {s: StrategyResult(s) for s in Strategy}
+    results = {s: StrategyResult(s) for s in ABLATED}
     for case in cases:
         started = time.perf_counter()
         vector = embedder(case.question)
         embed_ms.append(int((time.perf_counter() - started) * 1000))
-        for strategy in Strategy:
+        for strategy in ABLATED:
             for _ in range(runs):
                 retrieval = retriever.search(case.question, strategy, TOP_K, vector=vector)
                 results[strategy].search_ms.append(retrieval.search_ms)
@@ -241,18 +244,18 @@ def render(
         "",
         "Keyword queries are where BM25 is expected to help; natural language is where it may not.",
         "",
-        "| Family | Questions | " + " | ".join(letters[s] for s in Strategy) + " |",
-        "|---|---|" + "---|" * len(Strategy),
+        "| Family | Questions | " + " | ".join(letters[s] for s in ABLATED) + " |",
+        "|---|---|" + "---|" * len(ABLATED),
     ]
     for kind in sorted({c.kind for c in in_scope}):
         family = [c for c in in_scope if c.kind == kind]
         cells = []
-        for strategy in Strategy:
+        for strategy in ABLATED:
             ids = results[strategy].retrievals
             cells.append(f"{mean([recall_at_k(ids[c.id].ids, c.relevant, 3) for c in family]):.2f}")
         lines.append(f"| {kind} | {len(family)} | " + " | ".join(cells) + " |")
 
-    for strategy in (s for s in Strategy if s.reranked):
+    for strategy in (s for s in ABLATED if s.reranked):
         lines += [
             "",
             f"## Threshold sweep for configuration {letters[strategy]}",
@@ -311,12 +314,12 @@ def render(
         "",
         "## Per question",
         "",
-        "| Id | Kind | Question | " + " | ".join(letters[s] for s in Strategy) + " |",
-        "|---|---|---|" + "---|" * len(Strategy),
+        "| Id | Kind | Question | " + " | ".join(letters[s] for s in ABLATED) + " |",
+        "|---|---|---|" + "---|" * len(ABLATED),
     ]
     for case in cases:
         cells = []
-        for strategy in Strategy:
+        for strategy in ABLATED:
             ids = results[strategy].retrievals[case.id].ids
             if case.unanswerable:
                 cells.append("abstained" if not ids else f"{len(ids)} hits")

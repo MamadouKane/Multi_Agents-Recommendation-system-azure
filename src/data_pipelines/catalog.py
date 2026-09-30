@@ -71,6 +71,11 @@ PRODUCT_ID_OVERRIDES = {"Dark chocolate": "dark-chocolate-drinking"}
 # Display name corrections. The raw spelling is kept as an alias so customers typing it still match.
 DISPLAY_NAME_FIXES = {"Carmel syrup": "Caramel syrup"}
 
+# Names customers use that the catalogue name does not contain. "Hot chocolate" is what the Kaggle
+# sales data calls this drink, and what a customer says: without it, fuzzy matching sent
+# "hot chocolate" to the chocolate chip biscotti.
+EXTRA_ALIASES = {"Dark chocolate": ["Hot chocolate", "Drinking chocolate"]}
+
 
 class UnknownIngredientError(ValueError):
     """Raised when an ingredient has no allergen classification."""
@@ -108,7 +113,7 @@ def enrich(raw: dict[str, Any]) -> Product:
     name = DISPLAY_NAME_FIXES.get(raw_name, raw_name)
     product_id = PRODUCT_ID_OVERRIDES.get(raw_name, slugify(name))
     contains, may_contain = derive_allergens(raw["ingredients"])
-    aliases = [raw_name] if name != raw_name else []
+    aliases = ([raw_name] if name != raw_name else []) + EXTRA_ALIASES.get(raw_name, [])
 
     return Product(
         id=product_id,

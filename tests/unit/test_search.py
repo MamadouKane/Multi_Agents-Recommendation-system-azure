@@ -98,6 +98,7 @@ class TestSearchKwargs:
         assert {s for s in Strategy if s.reranked} == {
             Strategy.HYBRID_SEMANTIC,
             Strategy.VECTOR_SEMANTIC,
+            Strategy.VECTOR_GATED,
         }
 
     def test_the_vector_is_never_returned(self):
@@ -143,3 +144,40 @@ class TestThreshold:
 def test_empty_query_is_rejected():
     with pytest.raises(ValueError):
         Retriever(FakeBackend([]), fake_embed).search("   ")
+
+
+class TestVectorGated:
+    """ADR-008: vector order, reranker gate, one request."""
+
+    def test_is_one_semantic_query_without_keywords_over_every_candidate(self):
+        text, kwargs = build_search_kwargs(Strategy.VECTOR_GATED, "latte", [0.0] * 1536, 3, None)
+        assert text is None
+        assert kwargs["semantic_query"] == "latte"
+        assert kwargs["top"] == VECTOR_CANDIDATES  # re-sorted locally, so all candidates come back
+
+    def test_keeps_the_vector_order_not_the_reranker_order(self):
+        backend = FakeBackend(
+            [result("b", score=0.60, reranker=3.1), result("a", score=0.80, reranker=2.0)]
+        )
+        retrieval = Retriever(backend, fake_embed).search("q", Strategy.VECTOR_GATED, top_k=3)
+        assert retrieval.ids == ["a", "b"]
+        assert retrieval.best_reranker_score == 3.1
+
+    def test_one_relevant_document_opens_the_gate_for_the_top_k(self):
+        # Below the threshold on its own, "c" is still kept: the gate is all or nothing.
+        backend = FakeBackend(
+            [
+                result("a", 0.8, 1.9),
+                result("b", 0.7, 0.4),
+                result("c", 0.6, 0.3),
+                result("d", 0.5, 0.2),
+            ]
+        )
+        retrieval = Retriever(backend, fake_embed).search("q", Strategy.VECTOR_GATED, top_k=3)
+        assert retrieval.ids == ["a", "b", "c"]
+
+    def test_abstains_when_nothing_reaches_the_threshold(self):
+        backend = FakeBackend([result("a", 0.8, 1.68), result("b", 0.7, 1.2)])
+        retrieval = Retriever(backend, fake_embed).search("parking?", Strategy.VECTOR_GATED)
+        assert retrieval.found_nothing_relevant
+        assert retrieval.below_threshold == 2

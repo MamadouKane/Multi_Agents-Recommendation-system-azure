@@ -1,4 +1,4 @@
-.PHONY: venv install install-all lint format typecheck test cov check eval ablation run docker env catalog knowledge ingest index train secrets clean infra-preview infra-up search-up search-down
+.PHONY: venv install install-all lint format typecheck test cov check eval ablation run docker env catalog knowledge recommendations ingest index train secrets clean infra-preview infra-up search-up search-down
 
 # Every target uses the project virtualenv directly: no need to `source .venv/bin/activate`.
 VENV   := .venv
@@ -59,6 +59,9 @@ catalog:          ## Build the validated catalogue: data/raw/products.jsonl -> d
 
 knowledge:        ## Build the search corpus: hand-written docs + docs generated from the catalogue
 	$(PYTHON) -m src.data_pipelines.knowledge
+
+recommendations:  ## Convert the prototype's recommendation artefacts, keyed by product_id (until day 4)
+	$(PYTHON) -m src.data_pipelines.recommendations
 
 ingest:           ## Load the catalogue into Cosmos DB and Blob Storage (day 2)
 	$(PYTHON) -m src.data_pipelines.ingest_catalog

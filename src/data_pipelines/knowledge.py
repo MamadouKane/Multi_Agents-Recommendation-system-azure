@@ -169,8 +169,17 @@ def dietary_docs(products: list[Product]) -> list[KnowledgeDoc]:
     for allergen, label in ALLERGEN_LABELS.items():
         if allergen == "soy":
             continue  # nobody asks for a soy-free coffee; the product documents still say it
-        free = [p.name for p in products if allergen not in {*p.allergens, *p.may_contain}]
-        not_free = [p.name for p in products if p.name not in free]
+        # With the category, "which pastries have no gluten?" has an answer: none of them.
+        free = [
+            f"{p.name} ({p.category})"
+            for p in products
+            if allergen not in {*p.allergens, *p.may_contain}
+        ]
+        not_free = [
+            f"{p.name} ({p.category})"
+            for p in products
+            if allergen in {*p.allergens, *p.may_contain}
+        ]
         content = (
             f"Items without {label}: " + (", ".join(free) if free else "none") + ".\n"
             f"Items with {label}, certain or possible: "

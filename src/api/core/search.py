@@ -1,12 +1,14 @@
 """Retrieval over the `coffee-knowledge` index (roadmap task 2.7, ADR-008).
 
-Four strategies share one entry point, so the day 2 ablation and the details agent run exactly
+Five strategies share one entry point, so the day 2 ablation and the details agent run exactly
 the same code:
 
     vector            the prototype's behaviour: nearest neighbours on the embedding
     hybrid            BM25 and vector in one query, merged by Reciprocal Rank Fusion
     hybrid_semantic   hybrid, then the semantic reranker, then a relevance threshold
     vector_semantic   vector only, then the semantic reranker, then a relevance threshold
+    vector_gated      the ADR-008 decision, used by the details agent: vector ranking, and the
+                      best reranker score decides whether anything relevant exists at all
 
 Only the reranker score is on an absolute scale (0 to 4), so only the two semantic strategies
 can say "nothing relevant was found" and let the agent answer "I do not know".
@@ -32,10 +34,11 @@ class Strategy(StrEnum):
     HYBRID = "hybrid"
     HYBRID_SEMANTIC = "hybrid_semantic"
     VECTOR_SEMANTIC = "vector_semantic"
+    VECTOR_GATED = "vector_gated"
 
     @property
     def reranked(self) -> bool:
-        return self in (Strategy.HYBRID_SEMANTIC, Strategy.VECTOR_SEMANTIC)
+        return self in (Strategy.HYBRID_SEMANTIC, Strategy.VECTOR_SEMANTIC, Strategy.VECTOR_GATED)
 
     @property
     def uses_keywords(self) -> bool:
@@ -94,6 +97,10 @@ class Retrieval:
     def found_nothing_relevant(self) -> bool:
         return not self.hits
 
+    @property
+    def best_reranker_score(self) -> float:
+        return max((h.reranker_score or 0.0 for h in self.candidates), default=0.0)
+
 
 def odata_literal(value: str) -> str:
     """A string literal for an OData filter: single quotes are doubled, as the grammar requires."""
@@ -134,7 +141,9 @@ def build_search_kwargs(
     )
     kwargs: dict[str, Any] = {
         "vector_queries": [vector_query],
-        "top": top_k,
+        # The gated strategy re-sorts by vector score, so it needs every candidate the reranker
+        # saw, not only the reranker's own top_k.
+        "top": VECTOR_CANDIDATES if strategy is Strategy.VECTOR_GATED else top_k,
         "select": SELECT,
         "filter": odata_filter,
     }
@@ -144,7 +153,7 @@ def build_search_kwargs(
             "semantic_configuration_name": SEMANTIC_CONFIGURATION,
             "query_caption": "extractive",
         }
-    if strategy is Strategy.VECTOR_SEMANTIC:
+    if strategy in (Strategy.VECTOR_SEMANTIC, Strategy.VECTOR_GATED):
         # No search text, so no BM25 at all. The reranker still needs the question, which is
         # what semantic_query carries.
         kwargs["semantic_query"] = query
@@ -207,7 +216,9 @@ class Retriever:
         search_ms = int((time.perf_counter() - started) * 1000)
 
         hits = candidates
-        if strategy.reranked:
+        if strategy is Strategy.VECTOR_GATED:
+            hits = gate_on_best_reranker(candidates, self._min_reranker_score, top_k)
+        elif strategy.reranked:
             hits = above_threshold(candidates, self._min_reranker_score)
 
         return Retrieval(
@@ -223,3 +234,11 @@ class Retriever:
 
 def above_threshold(hits: Sequence[Hit], min_reranker_score: float) -> list[Hit]:
     return [h for h in hits if (h.reranker_score or 0.0) >= min_reranker_score]
+
+
+def gate_on_best_reranker(hits: Sequence[Hit], min_reranker_score: float, top_k: int) -> list[Hit]:
+    """ADR-008: all or nothing. The reranker only answers "is anything here relevant?"; when it
+    says yes, the order is the vector order, which ranked better on the ablation (MRR 0.98)."""
+    if max((h.reranker_score or 0.0 for h in hits), default=0.0) < min_reranker_score:
+        return []
+    return sorted(hits, key=lambda h: h.score, reverse=True)[:top_k]
