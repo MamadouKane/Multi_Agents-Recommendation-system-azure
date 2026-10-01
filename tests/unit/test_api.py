@@ -183,7 +183,12 @@ class TestProducts:
 class TestPlatform:
     def test_health_reports_the_catalogue_size(self, catalog):
         with client(catalog) as c:
-            assert c.get("/health").json() == {"status": "ok", "version": "0.1.0", "products": 18}
+            assert c.get("/health").json() == {
+                "status": "ok",
+                "version": "0.1.0",
+                "products": 18,
+                "recommender": None,
+            }
 
     def test_cors_allows_the_listed_origin_only(self, catalog):
         with client(catalog) as c:

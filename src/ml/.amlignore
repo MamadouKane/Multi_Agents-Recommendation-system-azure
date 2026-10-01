@@ -1,0 +1,6 @@
+# Only the reco package is needed on Azure ML: keep the code snapshot small.
+components/
+__pycache__/
+*.pyc
+submit.py
+mlruns/

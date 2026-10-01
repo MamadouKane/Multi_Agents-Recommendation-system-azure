@@ -1,0 +1,15 @@
+$schema: https://azuremlschemas.azureedge.net/latest/commandComponent.schema.json
+type: command
+name: coffee_reco_register_model
+display_name: Gate and register
+description: Refuses an artefact naming products outside the catalogue, then registers it with its evaluation as tags.
+version: 1
+code: ..
+environment: azureml://registries/azureml/environments/sklearn-1.5/labels/latest
+inputs:
+  model:
+    type: uri_folder
+  model_name:
+    type: string
+    default: coffee-reco-apriori
+command: python -m reco.register --model_dir ${{inputs.model}} --model_name ${{inputs.model_name}}

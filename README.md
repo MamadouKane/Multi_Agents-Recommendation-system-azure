@@ -17,9 +17,9 @@ CI/CD.
 |---|---|
 | **Answer product questions** | Retrieval augmented generation over the catalogue and the shop knowledge base, with citations. Allergens and ingredients come from the catalogue, never from the model's memory. |
 | **Take an order** | The model extracts items and quantities, Python resolves them against the catalogue and computes the total with `Decimal`. Off-menu items are called out explicitly. |
-| **Recommend products** | Market basket analysis (Apriori) trained on 49894 real transactions, plus popularity overall and by category. Every recommendation is checked against the catalogue before it is shown. |
-| **Upsell during an order** | Once the basket holds an item, the order agent hands over to the recommendation agent, once per conversation. |
-| **Refuse what is out of scope** | Two layers: Azure AI Content Safety with Prompt Shields for moderation and prompt injection, then an LLM scope check for anything unrelated to the shop. |
+| **Recommend products** | Association rules trained on Azure ML from 12,434 real receipts, completed by best sellers. Evaluated against a popularity baseline on a held-out week: hit@5 0.638 against 0.496. Every recommendation is checked against the catalogue before it is shown. |
+| **Upsell during an order** | After the first items, one suggestion per conversation, of complements only: a syrup with a latte, never a second coffee. |
+| **Refuse what is out of scope** | Three layers: Azure AI Content Safety with Prompt Shields, the model deployment's own content filter, then an LLM scope check for anything unrelated to the shop. |
 | **Explain itself** | Every turn is traced and stored, so a conversation can be replayed end to end from its identifier. |
 
 ## Architecture
@@ -157,7 +157,7 @@ models are billed per token.
   pre-commit hook and GitHub Push Protection is enabled.
 - **Everything is code.** Every Azure resource comes from Bicep, with a `what-if` preview before any
   change, and role assignments declared next to the resource they protect.
-- **Decisions are written down.** Seven ADRs record what was chosen, what was rejected and what it
+- **Decisions are written down.** Nine ADRs record what was chosen, what was rejected and what it
   costs, including the ones that turned out to be wrong and were corrected by measurement.
 - **Quality is measured, not claimed.** A golden dataset and threshold based evaluation gate block a
   pull request that degrades routing accuracy, retrieval recall or order correctness.
@@ -168,10 +168,10 @@ models are billed per token.
 
 | Phase | State |
 |---|---|
-| Design, ADRs, infrastructure as code | done, 11 resources deployed from source |
-| Data pipelines and hybrid retrieval | in progress |
-| Agents, API and safety | planned |
-| Recommender on Azure ML | planned |
+| Design, ADRs, infrastructure as code | done, every resource deployed from Bicep |
+| Data pipelines and retrieval chosen by ablation | done |
+| Agents, API, safety and telemetry | done |
+| Recommender on Azure ML, with offline evaluation | done |
 | Evaluation harness and CI gate | planned |
 | Deployment, CI/CD and rollback | planned |
 | Monitoring, dashboard and cost analysis | planned |

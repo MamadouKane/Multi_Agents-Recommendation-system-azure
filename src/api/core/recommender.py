@@ -37,12 +37,19 @@ class RecommendationArtifacts(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     source: str = Field(description="Where the artefacts come from, for the traces.")
+    version: str | None = Field(
+        default=None, description="Registered model version, such as 'coffee-reco-apriori:3'."
+    )
     rules: dict[str, list[Association]]
     popularity: dict[str, int] = Field(description="product_id -> number of transactions.")
 
     @classmethod
     def load(cls, path: Path) -> RecommendationArtifacts:
         return cls.model_validate_json(path.read_text(encoding="utf-8"))
+
+    @classmethod
+    def from_json(cls, data: bytes | str) -> RecommendationArtifacts:
+        return cls.model_validate_json(data)
 
 
 class Recommender:
@@ -53,6 +60,10 @@ class Recommender:
     @property
     def source(self) -> str:
         return self._artifacts.source
+
+    @property
+    def version(self) -> str | None:
+        return self._artifacts.version
 
     def for_basket(
         self,

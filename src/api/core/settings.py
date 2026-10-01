@@ -42,6 +42,12 @@ class Settings(BaseSettings):
     )
     # Content Safety is served by the same AI Services account as the models.
     azure_content_safety_endpoint: str = Field(default="", alias="AZURE_CONTENT_SAFETY_ENDPOINT")
+    # The published model (`make publish-model`), in the model-artefacts container. Set it empty
+    # to load RECOMMENDATIONS_PATH instead, such as the legacy conversion during development.
+    recommendations_blob: str = Field(
+        default="coffee-reco-apriori/current/recommendations.json", alias="RECOMMENDATIONS_BLOB"
+    )
+    models_container: str = Field(default="model-artefacts", alias="AZURE_STORAGE_MODELS_CONTAINER")
     recommendations_path: Path = Field(
         default=Path("data/processed/recommendations.json"), alias="RECOMMENDATIONS_PATH"
     )

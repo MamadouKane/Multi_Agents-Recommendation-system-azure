@@ -8,7 +8,7 @@ This folder is **read-only**. Transformations write to `data/processed/` (Git-ig
 | `raw/images/` | 18 product images (jpg/webp), 1:1 match with the catalogue's `image_path` | Day 2: Blob Storage upload |
 | `raw/knowledge/about_us.txt` | Shop profile: history, delivery areas, opening hours, sustainability | Day 2: RAG knowledge base |
 | `raw/knowledge/menu_items.txt` | Priced menu, **19 lines** (⚠️ see below) | Day 2: reference only, not the source of truth |
-| `raw/sales/201904 sales reciepts.csv` | 49,894 transaction lines, April 2019, 3 outlets | Day 4: Apriori training |
+| `raw/sales/201904 sales reciepts.csv` | 49,894 transaction lines, 2019-04-01 to 2019-04-29, 3 outlets | Day 4: Apriori training, Azure ML data asset `coffee-sales:1` |
 | `raw/sales/product.csv` | Product reference table from the Kaggle dataset (88 rows) | Day 4: category join |
 | `raw/sales/*.csv` | customer, staff, sales_outlet, Dates, generations, pastry inventory, sales targets | Day 4: exploration, unused in v1 |
 
@@ -38,3 +38,12 @@ Consequences:
 - The recommender maps sales ids 58 and 59 to `dark-chocolate-drinking` and **drops id 19**. At 1.2 % of the volume it would never reach Apriori's 5 % minimum support anyway.
 - `raw/knowledge/menu_items.txt` stays untouched (this folder is read only). It is no longer a source: the menu shown to customers is rendered from the catalogue (ADR-004), so the 3.00 USD line disappears on its own.
 - Display names are never used as keys again, which also removes the legacy notebook bug that merged ids 19, 58 and 59 under one name.
+
+## Receipt key (debt D14)
+
+`transaction_id` restarts every day in every outlet, and half of the sales are anonymous
+(`customer_id` 0). The prototype keyed receipts by `transaction_id` + `customer_id`, which merged
+unrelated anonymous receipts into "baskets" of up to 14 items. A receipt is keyed by
+`transaction_date` + `sales_outlet_id` + `transaction_id`: checked to always belong to a single
+customer, never more than 4 catalogue items. 12,434 receipts, 2,946 with two items or more
+(`src/ml/reco/data.py`).

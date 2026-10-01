@@ -30,4 +30,7 @@ var roleIds = {
 
   // Monitoring.
   monitoringMetricsPublisher: '3913510d-42f4-4e42-8a64-420c390055eb'
+
+  // Azure Machine Learning: submit jobs, log runs, register models.
+  azureMlDataScientist: 'f6c7c914-8db3-469d-8ca1-694a8f32e121'
 }

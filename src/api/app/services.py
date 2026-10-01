@@ -53,6 +53,8 @@ class Services:
     images: ImageStore
     conversations: ConversationStore
     price: ModelPrice
+    # Which registered model answers, for /health (task 4.11). None for a local file.
+    recommender_version: str | None = None
 
 
 def build_services(settings: Settings) -> Services:
@@ -81,7 +83,8 @@ def build_services(settings: Settings) -> Services:
         SearchClient(settings.azure_search_endpoint, settings.azure_search_index, credential),
         embedder,
     )
-    recommender = Recommender(RecommendationArtifacts.load(settings.recommendations_path), catalog)
+    blob_service = BlobServiceClient(settings.azure_storage_blob_endpoint, credential)
+    recommender = Recommender(load_recommendations(settings, blob_service), catalog)
 
     assistant = Assistant(
         guard=Guard(safety, chat),
@@ -93,12 +96,20 @@ def build_services(settings: Settings) -> Services:
         },
         recommender=recommender,
     )
-    images = BlobImageStore(
-        BlobServiceClient(settings.azure_storage_blob_endpoint, credential),
-        settings.images_container,
-    )
+    images = BlobImageStore(blob_service, settings.images_container)
     conversations = ConversationStore(
         database.get_container_client(settings.cosmos_conversations_container)
     )
     price = ModelPrice(settings.chat_input_usd_per_million, settings.chat_output_usd_per_million)
-    return Services(settings, assistant, catalog, images, conversations, price)
+    return Services(settings, assistant, catalog, images, conversations, price, recommender.version)
+
+
+def load_recommendations(
+    settings: Settings, blob_service: BlobServiceClient
+) -> RecommendationArtifacts:
+    """The published model from Blob Storage, or a local file when no blob is configured."""
+    if not settings.recommendations_blob:
+        return RecommendationArtifacts.load(settings.recommendations_path)
+    blob = blob_service.get_blob_client(settings.models_container, settings.recommendations_blob)
+    data: Any = blob.download_blob().readall()
+    return RecommendationArtifacts.from_json(bytes(data))

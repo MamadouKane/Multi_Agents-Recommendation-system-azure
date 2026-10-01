@@ -85,3 +85,6 @@ class Health(BaseModel):
     status: Literal["ok"]
     version: str
     products: int
+    recommender: str | None = Field(
+        default=None, description="Model behind the recommendations, such as coffee-reco-apriori:1."
+    )

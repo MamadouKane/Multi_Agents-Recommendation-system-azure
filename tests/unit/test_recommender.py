@@ -92,3 +92,47 @@ class TestRecommender:
         path = tmp_path / "recommendations.json"
         path.write_text(conversion.artifacts.model_dump_json(), encoding="utf-8")
         assert RecommendationArtifacts.load(path) == conversion.artifacts
+
+
+class FakeBlob:
+    def __init__(self, data):
+        self.data = data
+
+    def download_blob(self):
+        return self
+
+    def readall(self):
+        return self.data
+
+
+class FakeBlobService:
+    def __init__(self, data):
+        self.data = data
+        self.asked = []
+
+    def get_blob_client(self, container, name):
+        self.asked.append((container, name))
+        return FakeBlob(self.data)
+
+
+def test_the_api_loads_the_published_model_from_blob(conversion):
+    from src.api.app.services import load_recommendations
+    from src.api.core.settings import Settings
+
+    published = conversion.artifacts.model_copy(update={"version": "coffee-reco-apriori:3"})
+    service = FakeBlobService(published.model_dump_json().encode())
+    loaded = load_recommendations(Settings(), service)
+    assert loaded.version == "coffee-reco-apriori:3"
+    assert service.asked == [
+        ("model-artefacts", "coffee-reco-apriori/current/recommendations.json")
+    ]
+
+
+def test_an_empty_blob_setting_falls_back_to_the_local_file(conversion, tmp_path):
+    from src.api.app.services import load_recommendations
+    from src.api.core.settings import Settings
+
+    path = tmp_path / "recommendations.json"
+    path.write_text(conversion.artifacts.model_dump_json(), encoding="utf-8")
+    settings = Settings(RECOMMENDATIONS_BLOB="", RECOMMENDATIONS_PATH=str(path))
+    assert load_recommendations(settings, FakeBlobService(b"unused")).source.startswith("legacy")

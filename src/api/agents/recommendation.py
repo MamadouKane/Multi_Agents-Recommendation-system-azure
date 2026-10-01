@@ -91,7 +91,9 @@ class Recommendation:
             anchors = [pid for pid in request.product_ids if pid in self._catalog] or list(basket)
             if anchors:
                 products = self._recommender.for_basket(anchors, MAX_ITEMS)
-                if len(products) < MIN_ITEMS:
+                # Completed up to MAX_ITEMS, not MIN_ITEMS: on the test week, rules plus best
+                # sellers beat best sellers alone by 0.15 hit@5, rules alone did not (model card).
+                if len(products) < MAX_ITEMS:
                     # Some items have no rule: complete with best sellers, never repeating.
                     seen = {p.product_id for p in products} | set(anchors)
                     extra = [
@@ -99,7 +101,7 @@ class Recommendation:
                         for p in self._recommender.popular(top_k=MAX_ITEMS + len(seen))
                         if p.product_id not in seen
                     ]
-                    products += extra[: MIN_ITEMS - len(products)]
+                    products += extra[: MAX_ITEMS - len(products)]
                 return products, "basket"
 
         return self._recommender.popular(top_k=MAX_ITEMS), "popular"

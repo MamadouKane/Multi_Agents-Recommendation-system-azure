@@ -1,4 +1,4 @@
-.PHONY: venv install install-all lint format typecheck test cov check eval ablation run docker env catalog knowledge recommendations ingest index train secrets clean infra-preview infra-up search-up search-down
+.PHONY: venv install install-all lint format typecheck test cov check eval ablation run docker env catalog knowledge recommendations ingest index train-local train publish-model secrets clean infra-preview infra-up search-up search-down
 
 # Every target uses the project virtualenv directly: no need to `source .venv/bin/activate`.
 VENV   := .venv
@@ -43,7 +43,7 @@ ablation:         ## Retrieval ablation: vector vs hybrid vs hybrid + reranker (
 	$(PYTHON) -m evals.retrieval_ablation --runs 3
 
 run:              ## Run the API locally
-	$(BIN)/uvicorn src.api.app.main:app --reload --port 8000
+	$(BIN)/uvicorn --factory src.api.app.main:create_app --reload --port 8000
 
 docker:           ## Build the container image
 	docker build -t coffee-ai-api:local -f src/api/Dockerfile .
@@ -69,8 +69,14 @@ ingest:           ## Load the catalogue into Cosmos DB and Blob Storage (day 2)
 index:            ## Build the Azure AI Search index (day 2)
 	$(PYTHON) -m src.data_pipelines.build_index
 
-train:            ## Submit the recommendation training pipeline to Azure ML (day 4)
-	az ml job create -f src/ml/pipeline.yml
+train-local:      ## Run the recommender pipeline on this machine (MLflow in ./mlruns)
+	$(PYTHON) -m src.ml.run_local
+
+train:            ## Submit the recommender pipeline to Azure ML and follow it (day 4)
+	$(PYTHON) -m src.ml.submit --wait
+
+publish-model:    ## Promote the latest registered recommender to the API (blob model-artefacts/.../current)
+	$(PYTHON) -m src.ml.publish
 
 RG      := rg-coffeeai-dev
 SEARCH  := srch-coffeeai-dev-frc

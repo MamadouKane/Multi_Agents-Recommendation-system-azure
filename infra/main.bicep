@@ -33,6 +33,9 @@ param logDailyQuotaGb int = 1
 @description('Object id of the human operator, from: az ad signed-in-user show --query id -o tsv. Grants data plane roles for local runs.')
 param developerPrincipalId string = ''
 
+@description('Deploy the Azure ML workspace and its training cluster (day 4). Both cost nothing while idle.')
+param deployMl bool = true
+
 @description('Deploy Azure AI Search. It is the only hourly billed resource, so it is created per working session (ADR-002).')
 param deploySearch bool = true
 
@@ -162,6 +165,21 @@ module containerApp 'modules/containerapp.bicep' = {
   }
 }
 
+module ml 'modules/ml.bicep' = if (deployMl) {
+  name: 'ml'
+  params: {
+    name: 'mlw-${suffix}'
+    trainingIdentityName: 'id-${workload}-ml-${env}-${regionCode}'
+    location: location
+    tags: tags
+    storageAccountId: storage.outputs.id
+    keyVaultId: keyVault.outputs.id
+    appInsightsId: monitoring.outputs.appInsightsId
+    containerRegistryId: acr.outputs.id
+    developerPrincipalId: developerPrincipalId
+  }
+}
+
 @description('Resource id of the Log Analytics workspace, consumed by diagnostic settings later.')
 output logAnalyticsWorkspaceId string = monitoring.outputs.workspaceId
 
@@ -209,3 +227,9 @@ output searchEndpoint string = deploySearch ? search!.outputs.endpoint : ''
 output apiUrl string = 'https://${containerApp.outputs.fqdn}'
 
 output containerAppName string = containerApp.outputs.appName
+
+@description('Azure ML workspace, empty when deployMl is false.')
+output mlWorkspaceName string = deployMl ? ml!.outputs.workspaceName : ''
+
+@description('Azure ML training cluster, empty when deployMl is false.')
+output mlClusterName string = deployMl ? ml!.outputs.clusterName : ''

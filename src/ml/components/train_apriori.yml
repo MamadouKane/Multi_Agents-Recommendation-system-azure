@@ -1,0 +1,19 @@
+$schema: https://azuremlschemas.azureedge.net/latest/commandComponent.schema.json
+type: command
+name: coffee_reco_train_apriori
+display_name: Train association rules
+description: Trains the serving artefact on the whole month with the chosen min_support.
+version: 1
+code: ..
+environment: azureml://registries/azureml/environments/sklearn-1.5/labels/latest
+inputs:
+  baskets:
+    type: uri_folder
+  selection:
+    type: uri_folder
+outputs:
+  model:
+    type: uri_folder
+command: >-
+  python -m reco.train --baskets_dir ${{inputs.baskets}}
+  --selected ${{inputs.selection}} --output_dir ${{outputs.model}}

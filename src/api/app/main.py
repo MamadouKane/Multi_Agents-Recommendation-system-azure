@@ -1,4 +1,7 @@
-"""The FastAPI application: `uvicorn src.api.app.main:app`.
+"""The FastAPI application: `uvicorn --factory src.api.app.main:create_app`.
+
+No application object is built at import time: importing this module (tests, tools) must never
+read the environment, connect to Azure or switch the telemetry export on.
 
 `create_app` takes the function that builds the services, so tests start the real application,
 routes, validation and CORS included, on fakes.
@@ -26,8 +29,7 @@ def create_app(
     build: Callable[[Settings], Services] = build_services,
 ) -> FastAPI:
     settings = settings or get_settings()
-    # Before FastAPI() is created: the FastAPI instrumentation patches the class.
-    configure_telemetry(settings)
+    telemetry = configure_telemetry(settings)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
@@ -51,9 +53,25 @@ def create_app(
 
     @app.get("/health", response_model=Health, tags=["health"])
     def health(services: Annotated[Services, Depends(get_services)]) -> Health:
-        return Health(status="ok", version=settings.app_version, products=len(services.catalog))
+        return Health(
+            status="ok",
+            version=settings.app_version,
+            products=len(services.catalog),
+            recommender=services.recommender_version,
+        )
 
+    if telemetry:
+        instrument(app)
     return app
 
 
-app = create_app()
+def instrument(app: FastAPI) -> None:
+    """One request span per HTTP call, the parent of every span of the turn.
+
+    The distribution's automatic instrumentation patches the `fastapi.FastAPI` class, which is
+    too late for this module: it imported the class first. Instrumenting the instance is explicit
+    and does not depend on import order. Health probes are left out.
+    """
+    from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+
+    FastAPIInstrumentor.instrument_app(app, excluded_urls="health")

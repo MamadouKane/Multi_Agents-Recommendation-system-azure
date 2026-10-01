@@ -1,0 +1,15 @@
+$schema: https://azuremlschemas.azureedge.net/latest/commandComponent.schema.json
+type: command
+name: coffee_reco_prep_data
+display_name: Prepare baskets
+description: Raw April 2019 sales to receipts of catalogue products (debts D11 and D14).
+version: 1
+code: ..
+environment: azureml://registries/azureml/environments/sklearn-1.5/labels/latest
+inputs:
+  sales:
+    type: uri_folder
+outputs:
+  baskets:
+    type: uri_folder
+command: python -m reco.prep_data --sales_dir ${{inputs.sales}} --output_dir ${{outputs.baskets}}
