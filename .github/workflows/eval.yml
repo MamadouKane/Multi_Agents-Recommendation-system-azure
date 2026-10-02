@@ -1,0 +1,78 @@
+# The quality gate (task 6.8): the golden suite on real Azure services. A pull request that
+# changes an agent, a prompt or the evaluation, and degrades a blocking metric, fails here.
+name: eval
+
+on:
+  pull_request:
+    paths:
+      - "src/api/**"
+      - "src/data_pipelines/**"
+      - "data/knowledge/**"
+      - "data/raw/products.jsonl"
+      - "evals/**"
+      - "pyproject.toml"
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  id-token: write       # OIDC login to Azure, no secret
+  contents: read
+  pull-requests: write  # the report as a pull request comment
+
+# One evaluation at a time: they share the model quota and the AI Search service.
+concurrency:
+  group: eval
+  cancel-in-progress: false
+
+jobs:
+  eval:
+    name: golden suite
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      DEVELOPER_PRINCIPAL_ID: ${{ vars.DEVELOPER_PRINCIPAL_ID }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10
+        with:
+          python-version: "3.11"
+      - name: Install
+        run: uv venv .venv && uv pip install --python .venv/bin/python -e ".[evals]" && echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
+      - uses: azure/login@v3
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Configuration from the last infrastructure deployment
+        run: make env PYTHON=python
+      - name: AI Search for this run
+        run: scripts/ephemeral_search.sh up
+      - name: Golden suite
+        id: suite
+        continue-on-error: true
+        run: python -m evals.run_eval
+      - name: Report
+        if: always()
+        run: |
+          # Run reports are named run-<UTC timestamp>.md: the last one in name order is the latest.
+          report=$(find evals/reports -name 'run-*.md' | sort | tail -1)
+          cat "$report" >> "$GITHUB_STEP_SUMMARY"
+          echo "REPORT=$report" >> "$GITHUB_ENV"
+      - name: Comment on the pull request
+        if: always() && github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh pr comment "${{ github.event.pull_request.number }}" --body-file "$REPORT" --edit-last || gh pr comment "${{ github.event.pull_request.number }}" --body-file "$REPORT"
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: eval-report
+          path: evals/reports/run-*
+      - name: AI Search down, if this run created it
+        if: always()
+        run: scripts/ephemeral_search.sh down
+      - name: Block on a breached blocking threshold
+        if: steps.suite.outcome == 'failure'
+        run: |
+          echo "::error::A blocking evaluation threshold is breached, see the report."
+          exit 1

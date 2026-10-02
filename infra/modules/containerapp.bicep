@@ -1,6 +1,7 @@
 // Container Apps environment and the API container app.
-// Day 1 runs a public placeholder image: the real one is built and pushed on day 6, and the
-// deployment then only swaps the image tag on a new revision.
+// The image is a parameter: `make infra-up` and the infra workflow pass the image currently
+// running, so redeploying the infrastructure never replaces the API with the placeholder. New
+// images arrive through the API workflow, as new revisions (blue/green, scripts/deploy_api.sh).
 
 @description('Managed environment name.')
 param environmentName string
@@ -23,17 +24,24 @@ param managedIdentityId string
 @description('Client id of that identity. DefaultAzureCredential needs it to pick the right one.')
 param managedIdentityClientId string
 
-@description('Placeholder image until the real one exists in the registry (day 6).')
+@description('Image to run. The placeholder serves until the first API image exists (day 6).')
 param image string = 'mcr.microsoft.com/k8se/quickstart:latest'
 
-@description('Port the container listens on. The placeholder image serves on 80.')
-param targetPort int = 80
+@description('Registry login server the app pulls from with its managed identity.')
+param registryServer string
+
+@description('Version shown on /health: the commit the image was built from.')
+param appVersion string = 'placeholder'
 
 @description('Endpoints injected as environment variables, so the app never hardcodes a URL.')
 param serviceEndpoints object
 
 @description('Origins allowed to call the API. No wildcard, which clears debt D5.')
 param corsAllowedOrigins string = 'http://localhost:3000'
+
+// The placeholder listens on 80, the API image on 8000.
+var isPlaceholder = startsWith(image, 'mcr.microsoft.com/')
+var targetPort = isPlaceholder ? 80 : 8000
 
 // Reading the connection string here, rather than passing it around as a template output,
 // keeps it out of deployment history and out of `az deployment group show`.
@@ -103,6 +111,13 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
       }
       // Multiple revisions is what makes blue/green deployments possible on day 6.
       activeRevisionsMode: 'Multiple'
+      // Pulled with the managed identity (AcrPull): no registry password anywhere.
+      registries: [
+        {
+          server: registryServer
+          identity: managedIdentityId
+        }
+      ]
     }
     template: {
       containers: [
@@ -155,6 +170,42 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
               name: 'CORS_ALLOWED_ORIGINS'
               value: corsAllowedOrigins
             }
+            {
+              name: 'APP_VERSION'
+              value: appVersion
+            }
+          ]
+          // The placeholder has no /health; the API has.
+          probes: isPlaceholder ? [] : [
+            {
+              // Startup loads the catalogue and the recommender: up to a minute on a cold start.
+              type: 'Startup'
+              httpGet: {
+                path: '/health'
+                port: targetPort
+              }
+              initialDelaySeconds: 5
+              periodSeconds: 5
+              failureThreshold: 12
+            }
+            {
+              type: 'Readiness'
+              httpGet: {
+                path: '/health'
+                port: targetPort
+              }
+              periodSeconds: 10
+              failureThreshold: 3
+            }
+            {
+              type: 'Liveness'
+              httpGet: {
+                path: '/health'
+                port: targetPort
+              }
+              periodSeconds: 30
+              failureThreshold: 3
+            }
           ]
         }
       ]
@@ -179,6 +230,7 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
 
 output environmentId string = environment.id
 output appName string = app.name
+output image string = image
 
 @description('Public hostname of the app, used by the day 6 smoke tests.')
 output fqdn string = app.properties.configuration.ingress.fqdn

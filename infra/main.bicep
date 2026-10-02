@@ -33,6 +33,15 @@ param logDailyQuotaGb int = 1
 @description('Object id of the human operator, from: az ad signed-in-user show --query id -o tsv. Grants data plane roles for local runs.')
 param developerPrincipalId string = ''
 
+@description('API image. Make and the workflows pass the one running, so a redeployment keeps it.')
+param apiImage string = 'mcr.microsoft.com/k8se/quickstart:latest'
+
+@description('Commit the API image was built from, shown on /health.')
+param apiVersion string = 'placeholder'
+
+@description('Chat model capacity in thousands of tokens per minute; environments of one region share the quota.')
+param chatCapacity int = 200
+
 @description('Deploy the Azure ML workspace and its training cluster (day 4). Both cost nothing while idle.')
 param deployMl bool = true
 
@@ -117,6 +126,7 @@ module aiServices 'modules/ai-services.bicep' = {
     tags: tags
     appPrincipalId: identity.outputs.principalId
     developerPrincipalId: developerPrincipalId
+    chatCapacity: chatCapacity
   }
 }
 
@@ -153,13 +163,18 @@ module containerApp 'modules/containerapp.bicep' = {
     appInsightsName: monitoring.outputs.appInsightsName
     managedIdentityId: identity.outputs.id
     managedIdentityClientId: identity.outputs.clientId
+    image: apiImage
+    appVersion: apiVersion
+    registryServer: acr.outputs.loginServer
     serviceEndpoints: {
       openAi: aiServices.outputs.endpoint
       chatDeployment: aiServices.outputs.chatDeploymentName
       embeddingDeployment: aiServices.outputs.embeddingDeploymentName
       cosmos: cosmos.outputs.endpoint
       cosmosDatabase: cosmos.outputs.databaseName
-      search: deploySearch ? search!.outputs.endpoint : ''
+      // Always set, even while AI Search is deleted between sessions: the app starts, and only
+      // the details answers fail (503) until `make search-up`.
+      search: 'https://srch-${suffix}.search.windows.net'
       storageBlob: storage.outputs.blobEndpoint
     }
   }

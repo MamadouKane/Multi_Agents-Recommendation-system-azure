@@ -1,0 +1,9 @@
+# The build context is the repository root; only pyproject.toml and src/ are needed.
+*
+!pyproject.toml
+!src/__init__.py
+!src/api/
+!src/data_pipelines/
+**/__pycache__
+**/*.pyc
+**/.env

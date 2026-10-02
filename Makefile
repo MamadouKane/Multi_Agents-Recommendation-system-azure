@@ -1,4 +1,4 @@
-.PHONY: venv install install-all lint format typecheck test cov check eval red-team ablation run docker env catalog knowledge recommendations ingest index train-local train publish-model secrets clean infra-preview infra-up search-up search-down
+.PHONY: venv install install-all lint format typecheck test cov check eval red-team ablation run docker deploy smoke env catalog knowledge recommendations ingest index train-local train publish-model secrets clean infra-preview infra-up search-up search-down
 
 # Every target uses the project virtualenv directly: no need to `source .venv/bin/activate`.
 VENV   := .venv
@@ -48,8 +48,17 @@ ablation:         ## Retrieval ablation: vector vs hybrid vs hybrid + reranker (
 run:              ## Run the API locally
 	$(BIN)/uvicorn --factory src.api.app.main:create_app --reload --port 8000
 
-docker:           ## Build the container image
+docker:           ## Build the container image locally (your machine's architecture)
 	docker build -t coffee-ai-api:local -f src/api/Dockerfile .
+
+deploy:           ## Build the current commit in ACR (linux/amd64) and deploy it blue/green, as cd-api does
+	az acr build -r $(ACR) -f src/api/Dockerfile --platform linux/amd64 \
+		--build-arg APP_VERSION=$$(git rev-parse --short HEAD) -t coffee-ai-api:$$(git rev-parse --short HEAD) .
+	PATH=$(BIN):$$PATH scripts/deploy_api.sh $(ACR).azurecr.io/coffee-ai-api:$$(git rev-parse --short HEAD) $$(git rev-parse --short HEAD)
+
+smoke:            ## Smoke tests against the public URL of the deployed API
+	SMOKE_BASE_URL=https://$$(az containerapp show -g $(RG) -n $(APP) --query properties.configuration.ingress.fqdn -o tsv) \
+		$(BIN)/pytest tests/smoke -q
 
 env:              ## Write .env from the outputs of the last infrastructure deployment (endpoints only)
 	az deployment group show -g $(RG) \
@@ -83,21 +92,26 @@ publish-model:    ## Promote the latest registered recommender to the API (blob 
 
 RG      := rg-coffeeai-dev
 SEARCH  := srch-coffeeai-dev-frc
+APP     := ca-coffeeai-api-dev
+ACR     := crcoffeeaidevfrc
 
 infra-preview:    ## Preview infrastructure changes without applying them
 	az deployment group what-if -g $(RG) -f infra/main.bicep -p infra/main.parameters.json \
-		-p developerPrincipalId=$$(az ad signed-in-user show --query id -o tsv)
+		-p developerPrincipalId=$$(az ad signed-in-user show --query id -o tsv) \
+		$$(scripts/infra_state_params.sh $(RG) $(APP) $(SEARCH))
 
-infra-up:         ## Deploy the infrastructure
+infra-up:         ## Deploy the infrastructure, keeping the running API image and the AI Search state
 	az deployment group create -g $(RG) -n infra-$$(date +%Y%m%d-%H%M) \
 		-f infra/main.bicep -p infra/main.parameters.json \
 		-p developerPrincipalId=$$(az ad signed-in-user show --query id -o tsv) \
+		$$(scripts/infra_state_params.sh $(RG) $(APP) $(SEARCH)) \
 		--query properties.outputs
 
 search-up:        ## Recreate Azure AI Search for a working session (about 2 EUR per day, ADR-002)
 	az deployment group create -g $(RG) -n search-up-$$(date +%Y%m%d-%H%M) \
 		-f infra/main.bicep -p infra/main.parameters.json \
 		-p developerPrincipalId=$$(az ad signed-in-user show --query id -o tsv) \
+		$$(scripts/infra_state_params.sh $(RG) $(APP) $(SEARCH) --no-search) \
 		-p deploySearch=true --query properties.outputs.searchEndpoint
 
 search-down:      ## Delete Azure AI Search at the end of the session. The index is rebuilt by `make index`.

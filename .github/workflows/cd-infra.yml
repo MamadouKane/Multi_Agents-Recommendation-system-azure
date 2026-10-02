@@ -1,0 +1,60 @@
+# Infrastructure: what-if on every change, applied only after a human approval (task 6.10).
+name: cd-infra
+
+on:
+  push:
+    branches: [main]
+    paths: ["infra/**", "scripts/infra_state_params.sh"]
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: deploy-infra
+  cancel-in-progress: false
+
+jobs:
+  what-if:
+    name: what-if
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: azure/login@v3
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Preview, keeping the running API image and the AI Search state
+        run: |
+          # Several "-p name=value" pairs: split on purpose, into an array.
+          read -ra STATE <<< "$(scripts/infra_state_params.sh)"
+          {
+            echo '## Infrastructure what-if'
+            echo '```'
+            az deployment group what-if -g rg-coffeeai-dev -f infra/main.bicep \
+              -p infra/main.parameters.json -p "developerPrincipalId=${{ vars.DEVELOPER_PRINCIPAL_ID }}" \
+              "${STATE[@]}" --result-format ResourceIdOnly --no-pretty-print
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  deploy:
+    name: deploy (approval required)
+    needs: what-if
+    runs-on: ubuntu-latest
+    environment: production   # a reviewer must approve, after reading the what-if
+    steps:
+      - uses: actions/checkout@v7
+      - uses: azure/login@v3
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Deploy
+        run: |
+          read -ra STATE <<< "$(scripts/infra_state_params.sh)"
+          az deployment group create -g rg-coffeeai-dev -n "infra-$(date +%Y%m%d-%H%M)" \
+            -f infra/main.bicep -p infra/main.parameters.json \
+            -p "developerPrincipalId=${{ vars.DEVELOPER_PRINCIPAL_ID }}" \
+            "${STATE[@]}" -o none

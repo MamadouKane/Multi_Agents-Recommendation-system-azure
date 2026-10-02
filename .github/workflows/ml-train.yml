@@ -1,0 +1,39 @@
+# Recommender retraining on Azure ML (task 6.11): on demand, or monthly. Promotion to the API
+# stays a decision: it only happens when the run is started by hand with "publish" ticked.
+name: ml-train
+
+on:
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: "Promote the new model to the API after training"
+        type: boolean
+        default: false
+  schedule:
+    - cron: "0 4 1 * *"   # 1st of each month, 04:00 UTC
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  train:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10
+        with:
+          python-version: "3.11"
+      - name: Install
+        run: uv venv .venv && uv pip install --python .venv/bin/python -e ".[ml]" && echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
+      - uses: azure/login@v3
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Train, evaluate and register on the scale-to-zero cluster
+        run: python -m src.ml.submit --wait
+      - name: Promote to the API
+        if: github.event_name == 'workflow_dispatch' && inputs.publish
+        run: make env PYTHON=python && python -m src.ml.publish

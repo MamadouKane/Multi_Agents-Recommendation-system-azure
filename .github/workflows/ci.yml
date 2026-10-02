@@ -1,0 +1,58 @@
+# Quality checks on every pull request, and before every API deployment (called by cd-api).
+name: ci
+
+on:
+  pull_request:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    name: lint, types, unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10
+        with:
+          python-version: "3.11"
+      - name: Install
+        run: uv venv .venv && uv pip install --python .venv/bin/python -e ".[dev,ml,evals]"
+      - name: Lint
+        run: .venv/bin/ruff check src tests evals scripts && .venv/bin/ruff format --check src tests evals scripts
+      - name: Types
+        run: .venv/bin/mypy src
+      - name: Unit tests and coverage (NFR10, 60 % minimum)
+        run: >-
+          .venv/bin/pytest tests/unit --cov=src/api --cov=src/ml/reco
+          --cov-report=term --cov-fail-under=60
+
+  secrets:
+    name: gitleaks, whole history
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Scan every commit for secrets
+        run: docker run --rm -v "$PWD:/repo" ghcr.io/gitleaks/gitleaks:v8.30.1 detect --source /repo --redact -v
+
+  image:
+    name: image build, imports, Trivy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Build
+        run: docker build -f src/api/Dockerfile -t coffee-ai-api:ci .
+      - name: Every module imports from declared dependencies only
+        run: |
+          docker run --rm --entrypoint python coffee-ai-api:ci -c "
+          import importlib, pkgutil, src.api, src.data_pipelines
+          names = [m.name for p in (src.api, src.data_pipelines) for m in pkgutil.walk_packages(p.__path__, p.__name__ + '.')]
+          [importlib.import_module(n) for n in names]
+          print(len(names), 'modules imported')"
+      - name: Trivy, block on fixable HIGH and CRITICAL vulnerabilities
+        run: >-
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:0.75.0
+          image --quiet --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 coffee-ai-api:ci

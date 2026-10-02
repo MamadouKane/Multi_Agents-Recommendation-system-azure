@@ -1,0 +1,57 @@
+# Push to main -> checks -> evaluation -> image -> blue/green deployment with smoke tests and
+# automatic rollback (task 6.9). Nobody has to watch it.
+name: cd-api
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "src/api/**"
+      - "src/data_pipelines/**"
+      - "pyproject.toml"
+      - ".dockerignore"
+      - "scripts/deploy_api.sh"
+      - "tests/smoke/**"
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: deploy-api
+  cancel-in-progress: false
+
+jobs:
+  ci:
+    uses: ./.github/workflows/ci.yml
+
+  eval:
+    uses: ./.github/workflows/eval.yml
+
+  deploy:
+    name: build and blue/green deploy
+    needs: [ci, eval]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10
+        with:
+          python-version: "3.11"
+      - name: Smoke test dependencies
+        run: uv venv .venv && uv pip install --python .venv/bin/python pytest httpx && echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
+      - uses: azure/login@v3
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Build in the registry (linux/amd64), tagged with the commit and latest
+        run: |
+          echo "VERSION=${GITHUB_SHA::7}" >> "$GITHUB_ENV"
+          az acr build -r crcoffeeaidevfrc -f src/api/Dockerfile --platform linux/amd64 \
+            --build-arg "APP_VERSION=${GITHUB_SHA::7}" \
+            -t "coffee-ai-api:${GITHUB_SHA::7}" -t coffee-ai-api:latest .
+      - name: Blue/green deployment, rolled back on any failed smoke test
+        run: scripts/deploy_api.sh "crcoffeeaidevfrc.azurecr.io/coffee-ai-api:$VERSION" "$VERSION"

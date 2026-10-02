@@ -16,17 +16,20 @@ param appPrincipalId string
 @description('Object id of the human operator running scripts locally. Empty means no assignment.')
 param developerPrincipalId string = ''
 
+@description('Chat model capacity, in thousands of tokens per minute. The Data Zone quota (200 in France Central for this subscription) is shared by every environment of the region.')
+@minValue(1)
+param chatCapacity int = 200
+
 @description('Chat model deployment. Capacity is expressed in thousands of tokens per minute.')
 param chatDeployment object = {
   name: 'gpt-5.4-mini'
   modelName: 'gpt-5.4-mini'
   modelVersion: '2026-03-17'
   skuName: 'DataZoneStandard'
-  // 200k tokens per minute, the whole Data Zone quota. Billing is per token, so capacity costs
-  // nothing by itself. What it really buys is requests: one per minute per 1k tokens, so 200
-  // requests per minute, about 65 turns (guard, router, agent). 30 made the day 5 evaluation
-  // fail with 429.
-  capacity: 200
+  // Billing is per token, so capacity costs nothing by itself. What it really buys is requests:
+  // one per minute per 1k tokens, so 200 requests per minute, about 65 turns (guard, router,
+  // agent). 30 made the day 5 evaluation fail with 429.
+  capacity: chatCapacity
 }
 
 @description('Embedding model deployment.')
