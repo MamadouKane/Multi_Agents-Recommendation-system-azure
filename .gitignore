@@ -39,10 +39,12 @@ outputs/
 data/processed/
 data/interim/
 
-# ---- Evaluation reports (keep the baseline) ----
+# ---- Evaluation reports: every run stays local; the baseline and the red team results are versioned ----
 evals/reports/*
 !evals/reports/.gitkeep
 !evals/reports/baseline.json
+!evals/reports/baseline.md
+!evals/reports/red_team.json
 
 # ---- Docs (temporarily untracked: cleanup in progress, re-added at the end of the project) ----
 # Exception: the diagram used by the README, otherwise it would not render on GitHub.

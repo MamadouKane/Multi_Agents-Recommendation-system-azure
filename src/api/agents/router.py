@@ -26,6 +26,9 @@ You route messages sent to the assistant of Merry's Way, a coffee shop. Pick one
 
 When a message both asks a question and orders ("what is in a latte? I'll take one"), choose
 order: the customer's action matters more than the question.
+When a message mentions an allergy, an intolerance or a diet (no milk, nut-free, gluten-free,
+vegan), choose details even if it asks for a suggestion: only details reads the allergen
+information, and a recommendation that ignores it could harm the customer.
 Judge the latest user message. Use the earlier turns to understand short follow-ups.
 """
 

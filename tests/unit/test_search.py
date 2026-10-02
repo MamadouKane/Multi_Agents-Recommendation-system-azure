@@ -181,3 +181,40 @@ class TestVectorGated:
         retrieval = Retriever(backend, fake_embed).search("parking?", Strategy.VECTOR_GATED)
         assert retrieval.found_nothing_relevant
         assert retrieval.below_threshold == 2
+
+
+class SkippingBackend(FakeBackend):
+    """The semantic ranker skips the first `skips` queries, as the free plan does under load."""
+
+    def __init__(self, results, skips):
+        super().__init__(results)
+        self.skips = skips
+
+    def search(self, search_text, **kwargs):
+        self.calls.append((search_text, kwargs))
+        if len(self.calls) <= self.skips:
+            return iter([{**r, "@search.reranker_score": None} for r in self.results])
+        return iter(self.results)
+
+
+RANKED = (result("a", 0.8, 3.1), result("b", 0.7, 2.0))
+
+
+class TestRerankerSkipped:
+    def test_a_skipped_reranking_is_retried(self, monkeypatch):
+        monkeypatch.setattr("src.api.core.search.time.sleep", lambda s: None)
+        backend = SkippingBackend(RANKED, skips=1)
+        retrieval = Retriever(backend, fake_embed).search("q", Strategy.VECTOR_GATED)
+        assert retrieval.reranked and retrieval.attempts == 2
+        assert retrieval.ids == ["a", "b"]
+
+    def test_never_a_false_abstention_when_the_ranker_stays_down(self, monkeypatch):
+        monkeypatch.setattr("src.api.core.search.time.sleep", lambda s: None)
+        backend = SkippingBackend(RANKED, skips=10)
+        retrieval = Retriever(backend, fake_embed).search("q", Strategy.VECTOR_GATED, top_k=1)
+        assert not retrieval.reranked and retrieval.attempts == 3
+        assert retrieval.ids == ["a"]  # the vector ranking, not "nothing relevant"
+
+    def test_an_empty_index_is_not_a_skipped_ranking(self):
+        retrieval = Retriever(FakeBackend([]), fake_embed).search("q", Strategy.VECTOR_GATED)
+        assert retrieval.reranked and retrieval.attempts == 1

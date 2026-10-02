@@ -1,0 +1,30 @@
+{"id": "d01", "kind": "clear", "messages": [{"role": "user", "content": "What time do you open on Saturday?"}], "expected": "details"}
+{"id": "d02", "kind": "clear", "messages": [{"role": "user", "content": "Is there gluten in the cranberry scone?"}], "expected": "details"}
+{"id": "d03", "kind": "clear", "messages": [{"role": "user", "content": "Where is the caf\u00e9?"}], "expected": "details"}
+{"id": "d04", "kind": "clear", "messages": [{"role": "user", "content": "How much is a chocolate croissant?"}], "expected": "details"}
+{"id": "d05", "kind": "clear", "messages": [{"role": "user", "content": "Do you deliver to Lower Manhattan?"}], "expected": "details"}
+{"id": "d06", "kind": "clear", "messages": [{"role": "user", "content": "Which syrups do you have?"}], "expected": "details"}
+{"id": "d07", "kind": "clear", "messages": [{"role": "user", "content": "Is the hazelnut syrup safe for someone with a nut allergy?"}], "expected": "details"}
+{"id": "d08", "kind": "clear", "messages": [{"role": "user", "content": "Do you accept Google Pay?"}], "expected": "details"}
+{"id": "d09", "kind": "follow_up", "messages": [{"role": "user", "content": "A latte please"}, {"role": "assistant", "content": "Here is your order so far:\n1 x Latte at 4.75 = 4.75 USD\nTotal: 4.75 USD\nWould you like anything else?"}, {"role": "user", "content": "is it made with dairy milk?"}], "expected": "details"}
+{"id": "d10", "kind": "ambiguous", "messages": [{"role": "user", "content": "Do you have anything without milk that you would recommend?"}], "expected": "details"}
+{"id": "o01", "kind": "clear", "messages": [{"role": "user", "content": "Can I get two cappuccinos?"}], "expected": "order"}
+{"id": "o02", "kind": "clear", "messages": [{"role": "user", "content": "I'd like a croissant and an espresso shot."}], "expected": "order"}
+{"id": "o03", "kind": "clear", "messages": [{"role": "user", "content": "Add a caramel syrup to my order please."}], "expected": "order"}
+{"id": "o04", "kind": "clear", "messages": [{"role": "user", "content": "Actually, remove the croissant."}], "expected": "order"}
+{"id": "o05", "kind": "clear", "messages": [{"role": "user", "content": "Cancel my order."}], "expected": "order"}
+{"id": "o06", "kind": "clear", "messages": [{"role": "user", "content": "Make that three lattes instead of one."}], "expected": "order"}
+{"id": "o07", "kind": "clear", "messages": [{"role": "user", "content": "I'll take the dark chocolate."}], "expected": "order"}
+{"id": "o08", "kind": "follow_up", "messages": [{"role": "user", "content": "A latte"}, {"role": "assistant", "content": "Here is your order so far:\n1 x Latte at 4.75 = 4.75 USD\nTotal: 4.75 USD\nWould you like anything else?"}, {"role": "user", "content": "no, that's all"}], "expected": "order"}
+{"id": "o09", "kind": "follow_up", "messages": [{"role": "user", "content": "A scone please"}, {"role": "assistant", "content": "Which scone would you like: Cranberry Scone, Ginger Scone, Jumbo Savory Scone or Oatmeal Scone?"}, {"role": "user", "content": "the ginger one"}], "expected": "order"}
+{"id": "o10", "kind": "ambiguous", "messages": [{"role": "user", "content": "What is in a cappuccino? I'll have one."}], "expected": "order"}
+{"id": "r01", "kind": "clear", "messages": [{"role": "user", "content": "What would you recommend with an espresso?"}], "expected": "recommendation"}
+{"id": "r02", "kind": "clear", "messages": [{"role": "user", "content": "Which pastry is the most popular?"}], "expected": "recommendation"}
+{"id": "r03", "kind": "clear", "messages": [{"role": "user", "content": "I can't decide what to drink, any ideas?"}], "expected": "recommendation"}
+{"id": "r04", "kind": "clear", "messages": [{"role": "user", "content": "What do people usually have with a croissant?"}], "expected": "recommendation"}
+{"id": "r05", "kind": "clear", "messages": [{"role": "user", "content": "Suggest a syrup for my latte."}], "expected": "recommendation"}
+{"id": "r06", "kind": "clear", "messages": [{"role": "user", "content": "What's good here?"}], "expected": "recommendation"}
+{"id": "r07", "kind": "clear", "messages": [{"role": "user", "content": "What's your best-selling coffee?"}], "expected": "recommendation"}
+{"id": "r08", "kind": "clear", "messages": [{"role": "user", "content": "Something sweet to go with my cappuccino?"}], "expected": "recommendation"}
+{"id": "r09", "kind": "follow_up", "messages": [{"role": "user", "content": "A latte please"}, {"role": "assistant", "content": "Here is your order so far:\n1 x Latte at 4.75 = 4.75 USD\nTotal: 4.75 USD\nWould you like anything else?"}, {"role": "user", "content": "what would go well with it?"}], "expected": "recommendation"}
+{"id": "r10", "kind": "ambiguous", "messages": [{"role": "user", "content": "Tell me about your pastries, which one should I pick?"}], "expected": "recommendation"}

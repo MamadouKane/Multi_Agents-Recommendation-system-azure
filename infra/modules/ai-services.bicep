@@ -22,7 +22,11 @@ param chatDeployment object = {
   modelName: 'gpt-5.4-mini'
   modelVersion: '2026-03-17'
   skuName: 'DataZoneStandard'
-  capacity: 30
+  // 200k tokens per minute, the whole Data Zone quota. Billing is per token, so capacity costs
+  // nothing by itself. What it really buys is requests: one per minute per 1k tokens, so 200
+  // requests per minute, about 65 turns (guard, router, agent). 30 made the day 5 evaluation
+  // fail with 429.
+  capacity: 200
 }
 
 @description('Embedding model deployment.')

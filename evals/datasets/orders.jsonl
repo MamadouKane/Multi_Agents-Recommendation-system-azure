@@ -1,0 +1,25 @@
+{"id": "o01", "kind": "basic", "turns": ["I'd like a latte and a croissant", "that's all"], "expected_items": {"latte": 1, "croissant": 1}, "expected_total": "8.00", "expected_status": "closed"}
+{"id": "o02", "kind": "basic", "turns": ["Two cappuccinos please", "no thanks"], "expected_items": {"cappuccino": 2}, "expected_total": "9.00", "expected_status": "closed"}
+{"id": "o03", "kind": "quantities", "turns": ["Three espresso shots and a ginger biscotti"], "expected_items": {"espresso-shot": 3, "ginger-biscotti": 1}, "expected_total": "8.50", "expected_status": "open"}
+{"id": "o04", "kind": "off_menu", "turns": ["A latte and a matcha latte please"], "expected_items": {"latte": 1}, "expected_total": "4.75", "expected_status": "open"}
+{"id": "o05", "kind": "off_menu", "turns": ["I want a croissant, a bagel and a cappuccino"], "expected_items": {"croissant": 1, "cappuccino": 1}, "expected_total": "7.75", "expected_status": "open"}
+{"id": "o06", "kind": "change", "turns": ["A latte", "make it two lattes"], "expected_items": {"latte": 2}, "expected_total": "9.50", "expected_status": "open"}
+{"id": "o07", "kind": "change", "turns": ["A cappuccino and a croissant", "actually remove the croissant"], "expected_items": {"cappuccino": 1}, "expected_total": "4.50", "expected_status": "open"}
+{"id": "o08", "kind": "cancel", "turns": ["Two lattes and an almond croissant", "cancel my order"], "expected_items": {}, "expected_total": "0.00", "expected_status": "open"}
+{"id": "o09", "kind": "alias", "turns": ["A hot chocolate please"], "expected_items": {"dark-chocolate-drinking": 1}, "expected_total": "5.00", "expected_status": "open"}
+{"id": "o10", "kind": "ambiguous", "turns": ["A scone please", "the cranberry one"], "expected_items": {"cranberry-scone": 1}, "expected_total": "3.50", "expected_status": "open"}
+{"id": "o11", "kind": "spelling", "turns": ["Can I get a carmel syrup and a latte?"], "expected_items": {"caramel-syrup": 1, "latte": 1}, "expected_total": "6.25", "expected_status": "open"}
+{"id": "o12", "kind": "spelling", "turns": ["A cappucino and an expresso"], "expected_items": {"cappuccino": 1, "espresso-shot": 1}, "expected_total": "6.50", "expected_status": "open"}
+{"id": "o13", "kind": "quantities", "turns": ["Four croissants and two chocolate croissants"], "expected_items": {"croissant": 4, "chocolate-croissant": 2}, "expected_total": "20.50", "expected_status": "open"}
+{"id": "o14", "kind": "multi_turn", "turns": ["A latte", "and a ginger scone", "and a hazelnut syrup in the latte", "that's everything"], "expected_items": {"latte": 1, "ginger-scone": 1, "hazelnut-syrup": 1}, "expected_total": "9.75", "expected_status": "closed"}
+{"id": "o15", "kind": "change", "turns": ["An espresso shot", "actually make it a cappuccino instead"], "expected_items": {"cappuccino": 1}, "expected_total": "4.50", "expected_status": "open"}
+{"id": "o16", "kind": "ambiguous", "turns": ["Two biscotti please", "chocolate chip"], "expected_items": {"chocolate-chip-biscotti": 2}, "expected_total": "5.00", "expected_status": "open"}
+{"id": "o17", "kind": "off_menu", "turns": ["A latte and a pumpkin spice muffin"], "expected_items": {"latte": 1}, "expected_total": "4.75", "expected_status": "open"}
+{"id": "o18", "kind": "basic", "turns": ["One dark chocolate and one jumbo savory scone", "no that's all"], "expected_items": {"dark-chocolate-drinking": 1, "jumbo-savory-scone": 1}, "expected_total": "8.25", "expected_status": "closed"}
+{"id": "o19", "kind": "quantities", "turns": ["I'd like 10 lattes for my team"], "expected_items": {"latte": 10}, "expected_total": "47.50", "expected_status": "open"}
+{"id": "o20", "kind": "interleaved", "turns": ["A croissant", "What time do you close today?", "ok, add a latte too"], "expected_items": {"croissant": 1, "latte": 1}, "expected_total": "8.00", "expected_status": "open"}
+{"id": "o21", "kind": "quantities", "turns": ["Two sugar free vanilla syrups and a cappuccino"], "expected_items": {"sugar-free-vanilla-syrup": 2, "cappuccino": 1}, "expected_total": "7.50", "expected_status": "open"}
+{"id": "o22", "kind": "upsell", "turns": ["A latte please", "yes, add a caramel syrup please"], "expected_items": {"latte": 1, "caramel-syrup": 1}, "expected_total": "6.25", "expected_status": "open"}
+{"id": "o23", "kind": "change", "turns": ["An oatmeal scone and a hazelnut biscotti", "remove everything except the scone"], "expected_items": {"oatmeal-scone": 1}, "expected_total": "3.25", "expected_status": "open"}
+{"id": "o24", "kind": "empty", "turns": ["Nothing for now, thanks"], "expected_items": {}, "expected_total": "0.00", "expected_status": "open"}
+{"id": "o25", "kind": "multi_turn", "turns": ["A latte, a cappuccino and an espresso shot", "replace the espresso shot with a croissant", "done"], "expected_items": {"latte": 1, "cappuccino": 1, "croissant": 1}, "expected_total": "12.50", "expected_status": "closed"}

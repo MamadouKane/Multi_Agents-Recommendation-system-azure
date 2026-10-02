@@ -57,7 +57,28 @@ class Services:
     recommender_version: str | None = None
 
 
-def build_services(settings: Settings) -> Services:
+@dataclass(frozen=True)
+class Components:
+    """Every part of the assistant, built once. The API wraps them in `Services`; the evaluation
+    harness (`evals/run_eval.py`) uses them directly, so it measures the code that is served."""
+
+    settings: Settings
+    catalog: Catalog
+    chat: ChatClient
+    retriever: Retriever
+    guard: Guard
+    router: Router
+    details: Details
+    order: Order
+    recommendation: Recommendation
+    recommender: Recommender
+    assistant: Assistant
+    price: ModelPrice
+    blob_service: BlobServiceClient
+    database: Any
+
+
+def build_components(settings: Settings) -> Components:
     settings.require(
         "azure_openai_endpoint",
         "azure_cosmos_endpoint",
@@ -86,22 +107,39 @@ def build_services(settings: Settings) -> Services:
     blob_service = BlobServiceClient(settings.azure_storage_blob_endpoint, credential)
     recommender = Recommender(load_recommendations(settings, blob_service), catalog)
 
+    guard = Guard(safety, chat)
+    router = Router(chat)
+    details = Details(retriever, chat, catalog)
+    order = Order(chat, catalog)
+    recommendation = Recommendation(chat, catalog, recommender)
     assistant = Assistant(
-        guard=Guard(safety, chat),
-        router=Router(chat),
-        agents={
-            "details": Details(retriever, chat, catalog),
-            "order": Order(chat, catalog),
-            "recommendation": Recommendation(chat, catalog, recommender),
-        },
+        guard=guard,
+        router=router,
+        agents={"details": details, "order": order, "recommendation": recommendation},
         recommender=recommender,
     )
-    images = BlobImageStore(blob_service, settings.images_container)
-    conversations = ConversationStore(
-        database.get_container_client(settings.cosmos_conversations_container)
-    )
     price = ModelPrice(settings.chat_input_usd_per_million, settings.chat_output_usd_per_million)
-    return Services(settings, assistant, catalog, images, conversations, price, recommender.version)
+    return Components(
+        settings, catalog, chat, retriever, guard, router, details, order, recommendation,
+        recommender, assistant, price, blob_service, database,
+    )  # fmt: skip
+
+
+def build_services(settings: Settings) -> Services:
+    parts = build_components(settings)
+    images = BlobImageStore(parts.blob_service, settings.images_container)
+    conversations = ConversationStore(
+        parts.database.get_container_client(settings.cosmos_conversations_container)
+    )
+    return Services(
+        settings,
+        parts.assistant,
+        parts.catalog,
+        images,
+        conversations,
+        parts.price,
+        parts.recommender.version,
+    )
 
 
 def load_recommendations(

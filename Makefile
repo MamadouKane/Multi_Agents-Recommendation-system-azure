@@ -1,4 +1,4 @@
-.PHONY: venv install install-all lint format typecheck test cov check eval ablation run docker env catalog knowledge recommendations ingest index train-local train publish-model secrets clean infra-preview infra-up search-up search-down
+.PHONY: venv install install-all lint format typecheck test cov check eval red-team ablation run docker env catalog knowledge recommendations ingest index train-local train publish-model secrets clean infra-preview infra-up search-up search-down
 
 # Every target uses the project virtualenv directly: no need to `source .venv/bin/activate`.
 VENV   := .venv
@@ -36,8 +36,11 @@ cov:              ## Unit tests with coverage (NFR10 threshold: 60%)
 
 check: lint typecheck cov   ## Everything CI verifies
 
-eval:             ## Golden evaluation suite (day 5)
-	$(PYTHON) evals/run_eval.py --thresholds evals/thresholds.yaml
+eval:             ## Golden evaluation suite: 100 cases, exits 1 when a blocking threshold fails
+	$(PYTHON) -m evals.run_eval
+
+red-team:         ## 20 hand-written attacks through the whole assistant (day 5)
+	$(PYTHON) -m evals.red_team
 
 ablation:         ## Retrieval ablation: vector vs hybrid vs hybrid + reranker (ADR-002)
 	$(PYTHON) -m evals.retrieval_ablation --runs 3

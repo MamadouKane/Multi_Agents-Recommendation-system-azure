@@ -13,7 +13,7 @@ Three services for the agents:
 from __future__ import annotations
 
 import re
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
 from typing import Any, Literal, Protocol
 
@@ -30,10 +30,15 @@ FILLER_WORDS = {"a", "an", "the", "some", "please", "of", "another", "more"}
 NUMBER_WORDS = {"one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten"}
 
 # A candidate is kept when WRatio reaches this, and a winner must beat the runner-up by the margin.
-CANDIDATE_SCORE = 88
+# Floor of the overall similarity for a candidate that passed the word rule ("expresso" against
+# "espresso shot" scores 78.8).
+CANDIDATE_SCORE = 70
 WINNER_MARGIN = 8
 # A near exact spelling of a full name ("lattes", "cappucino") is accepted on its own.
 SPELLING_SCORE = 88
+# One typed word against one word of a name: 87.5 for "expresso"/"espresso", while "scone" and
+# "stone" (80) or "ginger" and "finger" (83) stay apart.
+WORD_SCORE = 85
 
 
 class CosmosContainer(Protocol):
@@ -50,6 +55,36 @@ class Resolution:
     @property
     def found(self) -> bool:
         return self.product is not None
+
+
+NUMBER_VALUES = {
+    word: value
+    for value, word in enumerate(
+        ["one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten"], start=1
+    )
+}
+
+
+MAX_QUANTITY = 50  # per item, as OrderLineRequest allows
+
+
+def quantity_in(text: str) -> int | None:
+    """The quantity a customer typed with a name ("two expressos", "3 lattes"), 1 by default,
+    None when it is above what the assistant takes ("1000 lattes")."""
+    for word in re.findall(r"[a-z0-9]+", text.lower()):
+        if word.isdigit():
+            return int(word) if 0 < int(word) <= MAX_QUANTITY else None
+        if word in NUMBER_VALUES:
+            return NUMBER_VALUES[word]
+    return 1
+
+
+def covers(typed: Iterable[str], label_words: Sequence[str]) -> bool:
+    """Every typed word is a word of the label, or a near spelling of one (day 5: "expresso")."""
+    return all(
+        any(word == other or fuzz.ratio(word, other) >= WORD_SCORE for other in label_words)
+        for word in typed
+    )
 
 
 def normalise(text: str) -> list[str]:
@@ -77,6 +112,8 @@ class Catalog:
         for product in active:
             for label in (product.name, *product.aliases):
                 self._labels[" ".join(normalise(label))] = product
+        # Every word of every name, for "does this message name a product at all?".
+        self._label_words = {word for label in self._labels for word in label.split()}
 
     @classmethod
     def from_cosmos(cls, container: CosmosContainer) -> Catalog:
@@ -114,6 +151,10 @@ class Catalog:
             lines.append(line)
         return "\n".join(lines)
 
+    def mentions_a_product(self, text: str) -> bool:
+        """True when a word of the text is a word of a product name, give or take a typo."""
+        return any(covers([word], list(self._label_words)) for word in normalise(text))
+
     def resolve(self, text: str) -> Resolution:
         words = normalise(text)
         key = " ".join(words)
@@ -131,19 +172,20 @@ class Catalog:
         if spelling and spelling[1] >= SPELLING_SCORE:
             return Resolution("fuzzy", text, self._labels[spelling[0]])
 
-        # 3. A partial name: accepted only when every word typed belongs to the product name.
-        #    This is what stops "matcha latte" from becoming a latte.
-        matches = process.extract(
-            key, list(self._labels), scorer=fuzz.WRatio, processor=utils.default_process, limit=6
-        )
+        # 3. A partial name: accepted only when every word typed belongs to the product name,
+        #    give or take a typo in that word ("expresso" for "espresso"). This is what stops
+        #    "matcha latte" from becoming a latte.
+        # The word rule decides who is a candidate; the overall score only ranks them and
+        # separates a clear winner from an ambiguity.
         typed = set(words)
         covering: dict[str, tuple[Product, float]] = {}
-        for label, score, _ in matches:
-            product = self._labels[label]
-            if score >= CANDIDATE_SCORE and typed <= set(label.split()):
-                best = covering.get(product.product_id)
-                if best is None or score > best[1]:
-                    covering[product.product_id] = (product, score)
+        for label, product in self._labels.items():
+            if not covers(typed, label.split()):
+                continue
+            score = fuzz.WRatio(key, label, processor=utils.default_process)
+            best = covering.get(product.product_id)
+            if score >= CANDIDATE_SCORE and (best is None or score > best[1]):
+                covering[product.product_id] = (product, score)
 
         ranked = sorted(covering.values(), key=lambda item: item[1], reverse=True)
         if not ranked:

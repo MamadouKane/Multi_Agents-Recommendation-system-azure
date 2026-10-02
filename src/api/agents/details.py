@@ -87,11 +87,14 @@ class Details:
             "documents": [h.id for h in hits],
             "best_reranker_score": retrieval.best_reranker_score,
             "retrieval_ms": retrieval.latency_ms,
+            "reranked": retrieval.reranked,
         }
         if not hits:
             return AgentReply("details", NO_ANSWER, usage=usage, trace=trace | {"abstained": True})
 
         context = "\n\n".join(f"[{i}] {h.title}\n{h.content}" for i, h in enumerate(hits, 1))
+        # Kept in the trace for offline groundedness scoring; never persisted nor put on spans.
+        trace["context"] = context
         result = self._chat.text(
             [
                 {"role": "system", "content": ANSWER_PROMPT.format(context=context)},

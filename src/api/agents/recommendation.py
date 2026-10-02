@@ -56,7 +56,12 @@ class Recommendation:
         self._recommender = recommender
 
     def answer(self, messages: Sequence[ChatMessage]) -> AgentReply:
-        basket = [item.product_id for item in previous_order(messages)[0].items]
+        # Only catalogue identifiers from client memory reach the prompt (ADR-005).
+        basket = [
+            item.product_id
+            for item in previous_order(messages)[0].items
+            if item.product_id in self._catalog
+        ]
         prompt = RECOMMENDATION_PROMPT.format(
             menu=self._catalog.render_menu_for_prompt(), basket=", ".join(basket) or "(empty)"
         )

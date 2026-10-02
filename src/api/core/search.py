@@ -51,6 +51,8 @@ class Strategy(StrEnum):
 VECTOR_CANDIDATES = 50
 SEMANTIC_CONFIGURATION = "default"
 SELECT = ["id", "doc_type", "title", "content", "product_id", "category", "source"]
+# Seconds to wait before asking again when the semantic ranker skipped a query.
+RERANK_RETRY_DELAYS = (0.3, 0.8)
 DEFAULT_MIN_RERANKER_SCORE = (
     1.7  # ADR-008: between unanswerable (max 1.68) and answerable (min 1.77)
 )
@@ -86,6 +88,10 @@ class Retrieval:
     embed_ms: int = 0
     search_ms: int = 0
     below_threshold: int = 0
+    # False when the semantic ranker was asked for but did not run (throttled): the gate then
+    # had no score to decide on, which is not the same as "nothing relevant".
+    reranked: bool = True
+    attempts: int = 1
 
     @property
     def latency_ms(self) -> int:
@@ -215,6 +221,8 @@ class Retriever:
                     "search.embed_ms": retrieval.embed_ms,
                     "search.search_ms": retrieval.search_ms,
                     "search.document_ids": retrieval.ids,
+                    "search.reranked": retrieval.reranked,
+                    "search.attempts": retrieval.attempts,
                 }
             )
             return retrieval
@@ -241,12 +249,27 @@ class Retriever:
         search_text, kwargs = build_search_kwargs(
             strategy, query, vector, top_k, build_filter(doc_types, category)
         )
-        candidates = [to_hit(r) for r in self._backend.search(search_text, **kwargs)]
+        attempts = 0
+        while True:
+            attempts += 1
+            candidates = [to_hit(r) for r in self._backend.search(search_text, **kwargs)]
+            reranked = not strategy.reranked or not candidates or has_reranker_scores(candidates)
+            if reranked or attempts > len(RERANK_RETRY_DELAYS):
+                break
+            # Measured on day 5: under concurrent queries the semantic ranker's free plan
+            # silently returns results without reranking, about one query in three.
+            time.sleep(RERANK_RETRY_DELAYS[attempts - 1])
         search_ms = int((time.perf_counter() - started) * 1000)
 
         hits = candidates
         if strategy is Strategy.VECTOR_GATED:
-            hits = gate_on_best_reranker(candidates, self._min_reranker_score, top_k)
+            hits = (
+                gate_on_best_reranker(candidates, self._min_reranker_score, top_k)
+                if reranked
+                # No score to gate on: serve the vector ranking rather than a false "I do not
+                # know". The details prompt still declines when the context lacks the answer.
+                else sorted(candidates, key=lambda h: h.score, reverse=True)[:top_k]
+            )
         elif strategy.reranked:
             hits = above_threshold(candidates, self._min_reranker_score)
 
@@ -258,7 +281,13 @@ class Retriever:
             embed_ms=embed_ms,
             search_ms=search_ms,
             below_threshold=len(candidates) - len(hits),
+            reranked=reranked,
+            attempts=attempts,
         )
+
+
+def has_reranker_scores(hits: Sequence[Hit]) -> bool:
+    return any(h.reranker_score is not None for h in hits)
 
 
 def above_threshold(hits: Sequence[Hit], min_reranker_score: float) -> list[Hit]:

@@ -157,10 +157,11 @@ models are billed per token.
   pre-commit hook and GitHub Push Protection is enabled.
 - **Everything is code.** Every Azure resource comes from Bicep, with a `what-if` preview before any
   change, and role assignments declared next to the resource they protect.
-- **Decisions are written down.** Nine ADRs record what was chosen, what was rejected and what it
+- **Decisions are written down.** Ten ADRs record what was chosen, what was rejected and what it
   costs, including the ones that turned out to be wrong and were corrected by measurement.
-- **Quality is measured, not claimed.** A golden dataset and threshold based evaluation gate block a
-  pull request that degrades routing accuracy, retrieval recall or order correctness.
+- **Quality is measured, not claimed.** 100 golden cases and a threshold based evaluation gate block a
+  change that degrades routing, retrieval, safety or order correctness. Baseline: every threshold
+  met, routing 100 %, order totals exact, 0.002 USD per conversation, p95 latency 2.2 s.
 - **Everything is observable.** OpenTelemetry traces, token and cost metrics per conversation, and
   an alert when an order total ever mismatches.
 
@@ -172,7 +173,7 @@ models are billed per token.
 | Data pipelines and retrieval chosen by ablation | done |
 | Agents, API, safety and telemetry | done |
 | Recommender on Azure ML, with offline evaluation | done |
-| Evaluation harness and CI gate | planned |
+| Evaluation harness and quality gate (100 golden cases, red team) | done, CI wiring on day 6 |
 | Deployment, CI/CD and rollback | planned |
 | Monitoring, dashboard and cost analysis | planned |
 
