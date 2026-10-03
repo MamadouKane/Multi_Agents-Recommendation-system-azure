@@ -63,6 +63,12 @@ var tags = {
 // <type>-<workload>-<env>-<region> for resources that accept hyphens.
 var suffix = '${workload}-${env}-${regionCode}'
 
+// AI Search is deleted between working sessions, but its name, so its endpoint, never changes.
+// Always published: the app starts without it (questions needing it fail with a 503), and
+// `make env` gives the evaluation workflow the right endpoint whether or not the service runs
+// at deployment time (an empty value failed the first evaluation run on GitHub, day 7).
+var searchEndpoint = 'https://srch-${suffix}.search.windows.net'
+
 // Storage accounts and registries accept neither hyphens nor upper case.
 var compactSuffix = '${workload}${env}${regionCode}'
 
@@ -177,7 +183,7 @@ module containerApp 'modules/containerapp.bicep' = {
       cosmosDatabase: cosmos.outputs.databaseName
       // Always set, even while AI Search is deleted between sessions: the app starts, and only
       // the details answers fail (503) until `make search-up`.
-      search: 'https://srch-${suffix}.search.windows.net'
+      search: searchEndpoint
       storageBlob: storage.outputs.blobEndpoint
     }
   }
@@ -251,7 +257,7 @@ output cosmosEndpoint string = cosmos.outputs.endpoint
 output cosmosDatabaseName string = cosmos.outputs.databaseName
 
 @description('Search endpoint, empty when the service is torn down between sessions.')
-output searchEndpoint string = deploySearch ? search!.outputs.endpoint : ''
+output searchEndpoint string = searchEndpoint
 
 @description('Public URL of the API. Day 1 serves the placeholder image, day 6 serves the real one.')
 output apiUrl string = 'https://${containerApp.outputs.fqdn}'
