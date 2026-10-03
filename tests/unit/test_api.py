@@ -181,6 +181,14 @@ class TestProducts:
 
 
 class TestPlatform:
+    def test_the_chat_page_is_served_at_the_root(self, catalog):
+        with client(catalog) as c:
+            response = c.get("/")
+        assert response.status_code == 200
+        assert response.headers["content-type"].startswith("text/html")
+        assert "/api/v1/chat" in response.text
+        assert "innerHTML" not in response.text  # answers are shown as text, never as HTML
+
     def test_health_reports_the_catalogue_size(self, catalog):
         with client(catalog) as c:
             assert c.get("/health").json() == {

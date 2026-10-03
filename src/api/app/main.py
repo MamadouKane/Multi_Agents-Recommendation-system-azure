@@ -11,10 +11,12 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Annotated
 
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 
 from src.api.app.contracts import Health
 from src.api.app.dependencies import get_services
@@ -22,6 +24,8 @@ from src.api.app.routers import chat, products
 from src.api.app.services import Services, build_services
 from src.api.app.telemetry import configure_telemetry
 from src.api.core.settings import Settings, get_settings
+
+WEB_PAGE = Path(__file__).parent / "web" / "index.html"
 
 
 def create_app(
@@ -50,6 +54,11 @@ def create_app(
     )
     app.include_router(chat.router, prefix="/api/v1")
     app.include_router(products.router, prefix="/api/v1")
+
+    @app.get("/", include_in_schema=False)
+    def web() -> FileResponse:
+        """A minimal chat page, served by the API itself: same origin, so no CORS to open."""
+        return FileResponse(WEB_PAGE, media_type="text/html")
 
     @app.get("/health", response_model=Health, tags=["health"])
     def health(services: Annotated[Services, Depends(get_services)]) -> Health:

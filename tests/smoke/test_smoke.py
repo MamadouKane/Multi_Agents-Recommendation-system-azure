@@ -81,3 +81,8 @@ def test_recommendations_come_from_the_published_model(client):
     reply = chat(client, [{"role": "user", "content": "What goes well with a croissant?"}])
     assert reply["agent"] == "recommendation"
     assert reply["output"]["content"].count("\n- ") >= 3
+
+
+def test_the_chat_page_is_served(client):
+    page = client.get("/")
+    assert page.status_code == 200 and "Merry's Way" in page.text
