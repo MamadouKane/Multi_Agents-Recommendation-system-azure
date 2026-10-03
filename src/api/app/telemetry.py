@@ -60,6 +60,10 @@ def configure_telemetry(settings: Settings) -> bool:
         resource=Resource.create({SERVICE_NAME: SERVICE, SERVICE_VERSION: settings.app_version}),
         span_processors=[ConversationSpanProcessor()],
         logger_name="src",
+        # Keep every trace (NFR8: every turn replayable from its conversation id). Without it the
+        # distribution samples at 5 spans per second, and a turn makes about ten: on day 7 the
+        # load test kept 185 of 227 requests, and a replay could find nothing.
+        sampling_ratio=1.0,
     )
     _configured = True
     logger.info("telemetry export enabled")

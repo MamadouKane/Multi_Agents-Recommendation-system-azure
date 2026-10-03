@@ -1,0 +1,239 @@
+{
+  "version": "Notebook/1.0",
+  "items": [
+    {
+      "type": 1,
+      "content": {
+        "json": "# Coffee shop assistant\nVolume, routes, latency, cost, safety and errors of the deployed API. Every number comes from OpenTelemetry (`src/api/app/telemetry.py`); question texts are never in telemetry (NFR11): follow a `conversation_id` to Cosmos to read one."
+      }
+    },
+    {
+      "type": 9,
+      "content": {
+        "version": "KqlParameterItem/1.0",
+        "parameters": [
+          {
+            "id": "a3b1c0de-0000-4000-8000-000000000001",
+            "version": "KqlParameterItem/1.0",
+            "name": "TimeRange",
+            "type": 4,
+            "isRequired": true,
+            "value": {
+              "durationMs": 86400000
+            },
+            "typeSettings": {
+              "selectableValues": [
+                {
+                  "durationMs": 3600000
+                },
+                {
+                  "durationMs": 14400000
+                },
+                {
+                  "durationMs": 86400000
+                },
+                {
+                  "durationMs": 604800000
+                }
+              ]
+            }
+          }
+        ],
+        "style": "pills",
+        "queryType": 0,
+        "resourceType": "microsoft.operationalinsights/workspaces"
+      }
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "let cost_usd = toscalar(AppMetrics | where Name == 'chat.cost.usd' | summarize round(sum(Sum), 4));\nAppDependencies | where Name == 'chat.turn'\n| extend allowed = tolower(tostring(Properties['guard.allowed'])), conversation = tostring(Properties['conversation_id'])\n| summarize turns = sum(ItemCount), conversations = dcount(conversation), p50_ms = percentile(DurationMs, 50),\n    p95_ms = percentile(DurationMs, 95), blocked = sumif(ItemCount, allowed == 'false')\n| extend block_rate_pct = round(100.0 * blocked / turns, 1), cost_usd = cost_usd,\n    cost_per_conversation_usd = round(cost_usd / conversations, 5)\n| project turns, conversations, p50_ms, p95_ms, block_rate_pct, cost_usd, cost_per_conversation_usd",
+        "size": 4,
+        "title": "Overview",
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.operationalinsights/workspaces",
+        "crossComponentResources": [
+          "__WORKSPACE_ID__"
+        ],
+        "visualization": "table"
+      }
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "AppDependencies | where Name == 'chat.turn' | extend agent = tostring(Properties['chat.agent']), allowed = tolower(tostring(Properties['guard.allowed'])), conversation = tostring(Properties['conversation_id']) | summarize turns = sum(ItemCount) by bin(TimeGenerated, 15m), agent",
+        "size": 0,
+        "title": "Turns per agent",
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.operationalinsights/workspaces",
+        "crossComponentResources": [
+          "__WORKSPACE_ID__"
+        ],
+        "visualization": "timechart"
+      },
+      "customWidth": "50"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "AppDependencies | where Name == 'chat.turn' | extend agent = tostring(Properties['chat.agent']), allowed = tolower(tostring(Properties['guard.allowed'])), conversation = tostring(Properties['conversation_id']) | summarize turns = sum(ItemCount) by agent",
+        "size": 0,
+        "title": "Routes",
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.operationalinsights/workspaces",
+        "crossComponentResources": [
+          "__WORKSPACE_ID__"
+        ],
+        "visualization": "piechart"
+      },
+      "customWidth": "50"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "AppDependencies | where Name == 'chat.turn' | extend agent = tostring(Properties['chat.agent']), allowed = tolower(tostring(Properties['guard.allowed'])), conversation = tostring(Properties['conversation_id']) | summarize turns = sum(ItemCount), p50 = percentile(DurationMs, 50), p95 = percentile(DurationMs, 95) by agent | order by p95 desc",
+        "size": 0,
+        "title": "Latency per agent (ms)",
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.operationalinsights/workspaces",
+        "crossComponentResources": [
+          "__WORKSPACE_ID__"
+        ],
+        "visualization": "table"
+      },
+      "customWidth": "50"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "AppDependencies\n| where Name in ('guard', 'content_safety', 'router', 'search.query') or Name startswith 'agent ' or Name startswith 'chat gpt' or Name startswith 'embeddings'\n| summarize p50 = percentile(DurationMs, 50), p95 = percentile(DurationMs, 95), calls = sum(ItemCount) by step = Name\n| order by p95 desc",
+        "size": 0,
+        "title": "Where a turn spends its time (p95, ms)",
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.operationalinsights/workspaces",
+        "crossComponentResources": [
+          "__WORKSPACE_ID__"
+        ],
+        "visualization": "table"
+      },
+      "customWidth": "50"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "AppMetrics | where Name == 'chat.cost.usd' | summarize cost = sum(Sum) by bin(TimeGenerated, 15m) | order by TimeGenerated asc | extend cumulative_usd = row_cumsum(cost) | project TimeGenerated, cumulative_usd",
+        "size": 0,
+        "title": "Cumulative model cost (USD)",
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.operationalinsights/workspaces",
+        "crossComponentResources": [
+          "__WORKSPACE_ID__"
+        ],
+        "visualization": "timechart"
+      },
+      "customWidth": "50"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "AppMetrics | where Name == 'chat.tokens' | summarize tokens = sum(Sum) by bin(TimeGenerated, 15m), type = tostring(Properties['type'])",
+        "size": 0,
+        "title": "Tokens by type",
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.operationalinsights/workspaces",
+        "crossComponentResources": [
+          "__WORKSPACE_ID__"
+        ],
+        "visualization": "timechart"
+      },
+      "customWidth": "50"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "AppMetrics | where Name == 'guard.blocked' | summarize blocks = sum(Sum) by layer = tostring(Properties['layer']), reason = tostring(Properties['reason'])",
+        "size": 0,
+        "title": "Guard blocks by layer",
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.operationalinsights/workspaces",
+        "crossComponentResources": [
+          "__WORKSPACE_ID__"
+        ],
+        "visualization": "barchart"
+      },
+      "customWidth": "50"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "AppRequests | where Name startswith 'POST /api' or Name startswith 'GET /api' | summarize requests = sum(ItemCount), errors_5xx = sumif(ItemCount, toint(ResultCode) >= 500) by bin(TimeGenerated, 15m)",
+        "size": 0,
+        "title": "HTTP errors (5xx) and requests",
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.operationalinsights/workspaces",
+        "crossComponentResources": [
+          "__WORKSPACE_ID__"
+        ],
+        "visualization": "timechart"
+      },
+      "customWidth": "50"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "AppDependencies\n| where Name == 'search.query' and tolower(tostring(Properties['search.abstained'])) == 'true'\n| project TimeGenerated, conversation_id = tostring(Properties['conversation_id']),\n    best_reranker_score = todouble(Properties['search.best_reranker_score'])\n| order by TimeGenerated desc | take 50",
+        "size": 0,
+        "title": "Questions with no relevant document (read them in Cosmos by conversation id)",
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.operationalinsights/workspaces",
+        "crossComponentResources": [
+          "__WORKSPACE_ID__"
+        ],
+        "visualization": "table"
+      },
+      "customWidth": "50"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "AppMetrics | where Name == 'order.total.mismatch' | summarize mismatches = sum(Sum) | extend mismatches = coalesce(mismatches, 0.0)",
+        "size": 0,
+        "title": "Order total mismatches (must stay at 0)",
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.operationalinsights/workspaces",
+        "crossComponentResources": [
+          "__WORKSPACE_ID__"
+        ],
+        "visualization": "table"
+      },
+      "customWidth": "50"
+    }
+  ],
+  "isLocked": false,
+  "fallbackResourceIds": [
+    "__WORKSPACE_ID__"
+  ],
+  "$schema": "https://github.com/Microsoft/Application-Insights-Workbooks/blob/master/schema/workbook.json"
+}

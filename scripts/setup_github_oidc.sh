@@ -28,17 +28,26 @@ fi
 
 # Which GitHub tokens are trusted: pushes to main, pull requests, and the production environment
 # (the infra deployment job). A fork or another branch gets nothing.
+# The subject prefix is read from GitHub, not built: repositories using immutable subjects
+# present "repo:<owner>@<owner id>/<repo>@<repo id>", which the first version of this script
+# did not match (AADSTS700213 on the first workflow run, day 7).
+PREFIX=$(gh api "repos/$REPO/actions/oidc/customization/sub" --jq '.sub_claim_prefix // empty')
+PREFIX="${PREFIX:-repo:$REPO}"
 federate() {  # name subject
-  if ! az ad app federated-credential list --id "$APP_ID" --query "[?name=='$1']" -o tsv | grep -q .; then
-    az ad app federated-credential create --id "$APP_ID" --parameters "{
-      \"name\": \"$1\", \"issuer\": \"https://token.actions.githubusercontent.com\",
-      \"subject\": \"$2\", \"audiences\": [\"api://AzureADTokenExchange\"]}" -o none
+  current=$(az ad app federated-credential list --id "$APP_ID" --query "[?name=='$1'].subject | [0]" -o tsv)
+  body="{\"name\": \"$1\", \"issuer\": \"https://token.actions.githubusercontent.com\",
+    \"subject\": \"$2\", \"audiences\": [\"api://AzureADTokenExchange\"]}"
+  if [[ -z "$current" ]]; then
+    az ad app federated-credential create --id "$APP_ID" --parameters "$body" -o none
     echo "trusted $2"
+  elif [[ "$current" != "$2" ]]; then
+    az ad app federated-credential update --id "$APP_ID" --federated-credential-id "$1" --parameters "$body" -o none
+    echo "updated $1: $2"
   fi
 }
-federate main "repo:$REPO:ref:refs/heads/main"
-federate pull-request "repo:$REPO:pull_request"
-federate production "repo:$REPO:environment:production"
+federate main "$PREFIX:ref:refs/heads/main"
+federate pull-request "$PREFIX:pull_request"
+federate production "$PREFIX:environment:production"
 
 grant() {  # role scope
   az role assignment create --assignee-object-id "$SP_ID" --assignee-principal-type ServicePrincipal \

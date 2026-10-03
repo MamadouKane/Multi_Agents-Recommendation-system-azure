@@ -45,6 +45,7 @@ evals/reports/*
 !evals/reports/baseline.json
 !evals/reports/baseline.md
 !evals/reports/red_team.json
+!evals/reports/load_test.json
 
 # ---- Docs (temporarily untracked: cleanup in progress, re-added at the end of the project) ----
 # Exception: the diagram used by the README, otherwise it would not render on GitHub.

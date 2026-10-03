@@ -39,6 +39,9 @@ param apiImage string = 'mcr.microsoft.com/k8se/quickstart:latest'
 @description('Commit the API image was built from, shown on /health.')
 param apiVersion string = 'placeholder'
 
+@description('E-mail address for alert notifications. Empty: alerts fire and show in the portal only.')
+param alertEmail string = ''
+
 @description('Chat model capacity in thousands of tokens per minute; environments of one region share the quota.')
 param chatCapacity int = 200
 
@@ -192,6 +195,18 @@ module ml 'modules/ml.bicep' = if (deployMl) {
     appInsightsId: monitoring.outputs.appInsightsId
     containerRegistryId: acr.outputs.id
     developerPrincipalId: developerPrincipalId
+  }
+}
+
+module observability 'modules/observability.bicep' = {
+  name: 'observability'
+  params: {
+    location: location
+    tags: tags
+    workspaceId: monitoring.outputs.workspaceId
+    appInsightsName: monitoring.outputs.appInsightsName
+    apiUrl: 'https://${containerApp.outputs.fqdn}'
+    alertEmail: alertEmail
   }
 }
 

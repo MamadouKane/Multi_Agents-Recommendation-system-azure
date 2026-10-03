@@ -1,0 +1,46 @@
+{
+  "started_at": "2026-10-02T15:26:22Z",
+  "url": "https://ca-coffeeai-api-dev.redpebble-2638aea9.francecentral.azurecontainerapps.io",
+  "users": 10,
+  "minutes": 5.0,
+  "requests": 227,
+  "turns_per_minute": 45.4,
+  "errors": {},
+  "p50_s": 1.85,
+  "p95_s": 2.7,
+  "max_s": 22.46,
+  "by_scenario": {
+    "order": {
+      "requests": 120,
+      "p50_s": 1.85,
+      "p95_s": 2.44
+    },
+    "details": {
+      "requests": 48,
+      "p50_s": 2.01,
+      "p95_s": 3.07
+    },
+    "recommendation": {
+      "requests": 38,
+      "p50_s": 1.79,
+      "p95_s": 2.66
+    },
+    "attack": {
+      "requests": 21,
+      "p50_s": 0.64,
+      "p95_s": 1.56
+    }
+  },
+  "replicas_every_30_s": [
+    "1",
+    "1",
+    "1",
+    "1",
+    "1",
+    "1",
+    "1",
+    "1",
+    "1",
+    "1"
+  ]
+}

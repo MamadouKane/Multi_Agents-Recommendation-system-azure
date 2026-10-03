@@ -217,7 +217,10 @@ class ChatClient:
         self,
         factory: AzureOpenAIClientFactory,
         deployment: str,
-        timeout_s: float = 20.0,
+        # Measured on day 7: model calls answer in 0.5 s at p50 and under 1.1 s at p99, but one
+        # in about 400 hangs. 20 s let that one cost a customer 22 s; 8 s keeps a wide margin
+        # over a slow call and hands a hung one to the retry quickly.
+        timeout_s: float = 8.0,
         max_attempts: int = 3,
         wait: Callable[..., float] | None = None,
     ) -> None:
