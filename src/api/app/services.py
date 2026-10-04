@@ -98,7 +98,12 @@ def build_components(settings: Settings) -> Components:
 
     safety_endpoint = settings.content_safety_endpoint
     safety = ContentSafetyGate(
-        safety_endpoint, ContentSafetyClient(safety_endpoint, credential), BearerToken(credential)
+        safety_endpoint,
+        # The SDK waits up to 300 s by default; a customer should not.
+        ContentSafetyClient(
+            safety_endpoint, credential, connection_timeout=5, read_timeout=10, retry_total=1
+        ),
+        BearerToken(credential),
     )
     retriever = Retriever(
         SearchClient(settings.azure_search_endpoint, settings.azure_search_index, credential),

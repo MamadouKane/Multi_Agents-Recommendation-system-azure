@@ -114,7 +114,7 @@ def test_product_documents_carry_the_catalogue_price(corpus, products):
     latte = next(p for p in products if p.product_id == "latte")
     doc = corpus["product-latte"]
     assert doc.price == latte.price
-    assert f"{latte.price} USD" in doc.content
+    assert f"{latte.price} EUR" in doc.content
 
 
 def test_aliases_are_indexed_so_keyword_search_matches_them(corpus):

@@ -22,7 +22,7 @@ from src.api.core.catalog import Catalog
 # Every evaluator receives every case, crashed ones included: a case that raised (a 429, an
 # outage) counts as a failure, never as a case left out of the denominator.
 
-MONEY = re.compile(r"(\d+\.\d{2})\s*(?:USD|\$)|\$\s*(\d+(?:\.\d{2})?)")
+MONEY = re.compile(r"(\d+\.\d{2})\s*(?:EUR|€|USD|\$)|[€$]\s*(\d+(?:\.\d{2})?)")
 
 
 def router_accuracy(results: Sequence[Mapping[str, Any]]) -> dict[str, Any]:

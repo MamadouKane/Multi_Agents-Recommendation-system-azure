@@ -3,10 +3,10 @@
 {"id": "g03", "kind": "allergen", "question": "Is the chocolate croissant safe for someone with a soy allergy?", "reference": "Not guaranteed. The chocolate croissant contains gluten and milk and may contain soy, and every product is prepared in the same kitchen.", "relevant": ["product-chocolate-croissant"]}
 {"id": "g04", "kind": "allergen", "question": "Which of your drinks have no milk?", "reference": "The espresso shot is the only drink without milk. The cappuccino, the latte and the dark chocolate drink all contain milk.", "relevant": ["dietary-milk-free"]}
 {"id": "g05", "kind": "allergen", "question": "Can I eat the oatmeal scone if I avoid eggs?", "reference": "No. The oatmeal scone contains eggs, as well as gluten and milk.", "relevant": ["product-oatmeal-scone", "dietary-eggs-free"]}
-{"id": "g06", "kind": "price", "question": "How much does the almond croissant cost?", "reference": "The almond croissant costs 4.00 USD.", "relevant": ["product-almond-croissant", "menu-bakery", "menu-full"]}
-{"id": "g07", "kind": "price", "question": "What is the price of a cappuccino?", "reference": "A cappuccino costs 4.50 USD.", "relevant": ["product-cappuccino", "menu-coffee", "menu-full"]}
-{"id": "g08", "kind": "price", "question": "How much do the syrups cost?", "reference": "Every flavour syrup costs 1.50 USD.", "relevant": ["menu-flavours", "menu-full", "product-caramel-syrup", "product-chocolate-syrup", "product-hazelnut-syrup", "product-sugar-free-vanilla-syrup"]}
-{"id": "g09", "kind": "price", "question": "What is the cheapest pastry on the menu?", "reference": "The chocolate chip biscotti and the ginger biscotti, at 2.50 USD each.", "relevant": ["menu-bakery", "menu-full"]}
+{"id": "g06", "kind": "price", "question": "How much does the almond croissant cost?", "reference": "The almond croissant costs 4.00 EUR.", "relevant": ["product-almond-croissant", "menu-bakery", "menu-full"]}
+{"id": "g07", "kind": "price", "question": "What is the price of a cappuccino?", "reference": "A cappuccino costs 4.50 EUR.", "relevant": ["product-cappuccino", "menu-coffee", "menu-full"]}
+{"id": "g08", "kind": "price", "question": "How much do the syrups cost?", "reference": "Every flavour syrup costs 1.50 EUR.", "relevant": ["menu-flavours", "menu-full", "product-caramel-syrup", "product-chocolate-syrup", "product-hazelnut-syrup", "product-sugar-free-vanilla-syrup"]}
+{"id": "g09", "kind": "price", "question": "What is the cheapest pastry on the menu?", "reference": "The chocolate chip biscotti and the ginger biscotti, at 2.50 EUR each.", "relevant": ["menu-bakery", "menu-full"]}
 {"id": "g10", "kind": "hours", "question": "Are you open at 7:30 on a Saturday morning?", "reference": "No. On Saturday the caf\u00e9 opens at 8 AM.", "relevant": ["about-hours"]}
 {"id": "g11", "kind": "hours", "question": "What are your opening hours on weekdays?", "reference": "Monday to Friday, from 7 AM to 8 PM.", "relevant": ["about-hours"]}
 {"id": "g12", "kind": "delivery", "question": "Do you deliver to the West Village?", "reference": "Yes, the West Village is one of the four delivery areas.", "relevant": ["about-delivery", "faq-how-do-i-order"]}
@@ -23,3 +23,4 @@
 {"id": "n03", "kind": "unanswerable", "question": "How many calories are in a croissant?", "reference": "I don't have that information.", "relevant": []}
 {"id": "n04", "kind": "unanswerable", "question": "Do you offer a student discount?", "reference": "I don't have that information.", "relevant": []}
 {"id": "n05", "kind": "unanswerable", "question": "Can I book a table for Saturday evening?", "reference": "I don't have that information.", "relevant": []}
+{"id": "g21", "kind": "product", "question": "Tell me about the Cranberry Scone", "reference": "A soft, crumbly scone with sweet and tart cranberries, 3.50 EUR. It contains eggs, gluten and milk.", "relevant": ["product-cranberry-scone"], "must_not_mention": ["tea"]}

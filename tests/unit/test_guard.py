@@ -2,6 +2,7 @@
 
 from types import SimpleNamespace
 
+import httpx
 import pytest
 
 from src.api.agents.base import last_user_message, recent_turns
@@ -151,3 +152,37 @@ class TestContentSafetyGate:
         url, headers, _ = http.posted[0]
         assert "api-version=2024-09-01" in url
         assert headers == {"Authorization": "Bearer token-value"}
+
+
+class FlakyHttp(FakeHttp):
+    """Drops the first connection, as Content Safety did during a day 7 evaluation run."""
+
+    def __init__(self, failures):
+        super().__init__(attack=False)
+        self.failures = failures
+
+    def post(self, url, headers, json):
+        if self.failures:
+            self.failures -= 1
+            raise httpx.RemoteProtocolError("Server disconnected without sending a response.")
+        return super().post(url, headers, json)
+
+
+def flaky_gate(failures):
+    http = FlakyHttp(failures)
+    moderation = FakeModeration({"Hate": 0})
+    return ContentSafetyGate(
+        "https://aif.example/", moderation, FakeToken(), http, fast_retry=True
+    ), http
+
+
+def test_a_dropped_connection_is_retried():
+    gate_, http = flaky_gate(failures=1)
+    assert not gate_.check("A latte please").blocked
+    assert len(http.posted) == 1
+
+
+def test_an_unreachable_safety_service_fails_closed():
+    gate_, _ = flaky_gate(failures=5)
+    with pytest.raises(httpx.RemoteProtocolError):
+        gate_.check("A latte please")  # an error, never an "allowed" verdict

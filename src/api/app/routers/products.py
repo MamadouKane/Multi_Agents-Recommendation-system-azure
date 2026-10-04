@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from pathlib import PurePath
 from typing import Annotated
 
 from azure.core.exceptions import AzureError
@@ -16,6 +17,14 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["products"])
 
 IMAGE_CACHE = "public, max-age=86400"
+# Explicit, not mimetypes: the slim Linux image knows no ".webp", so the same code that passed on a
+# Mac served WebP images as application/octet-stream in the container (day 7).
+IMAGE_TYPES = {
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".webp": "image/webp",
+    ".png": "image/png",
+}
 
 
 @router.get("/products", response_model=list[ProductOut])
@@ -58,4 +67,8 @@ def product_image(
     except AzureError:
         logger.exception("image read failed", extra={"product_id": product_id})
         raise HTTPException(status_code=503, detail="image temporarily unavailable") from None
-    return Response(data, media_type="image/jpeg", headers={"Cache-Control": IMAGE_CACHE})
+    # The real type of the file: five of the eighteen images are WebP, all were served as JPEG.
+    media_type = IMAGE_TYPES.get(
+        PurePath(product.image_file).suffix.lower(), "application/octet-stream"
+    )
+    return Response(data, media_type=media_type, headers={"Cache-Control": IMAGE_CACHE})

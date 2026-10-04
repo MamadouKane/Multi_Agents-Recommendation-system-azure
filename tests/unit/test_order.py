@@ -24,12 +24,13 @@ class FakeChat:
         return ChatResult(self.extraction, Usage(900, 40, 20), 700, "m")
 
 
-def extraction(items=(), unrecognised=(), ambiguous=(), done=False):
+def extraction(items=(), unrecognised=(), ambiguous=(), done=False, suggestion=None):
     return OrderExtraction(
         items=[OrderLineRequest(product_id=p, quantity=q) for p, q in items],
         unrecognised=list(unrecognised),
         ambiguous=list(ambiguous),
         customer_done=done,
+        suggestion_category=suggestion,
     )
 
 
@@ -50,20 +51,20 @@ def run(catalog, result, messages=None):
 class TestPricing:
     def test_us1_latte_and_croissant_is_exactly_eight(self, catalog):
         reply, _ = run(catalog, extraction([("latte", 1), ("croissant", 1)]))
-        assert "1 x Latte at 4.75 = 4.75 USD" in reply.content
-        assert "Total: 8.00 USD" in reply.content
+        assert "1 x Latte at 4.75 = 4.75 EUR" in reply.content
+        assert "Total: 8.00 EUR" in reply.content
         assert reply.trace["order_total"] == "8.00"
 
     def test_the_model_never_sees_a_price(self, catalog):
         _, chat = run(catalog, extraction([("latte", 1)]))
         prompt = chat.calls[0][0]["content"]
-        assert "4.75" not in prompt and "USD" not in prompt
+        assert "4.75" not in prompt and "EUR" not in prompt
 
     def test_a_confirmed_order_is_closed_with_its_receipt(self, catalog):
         message = [user("two lattes, that's all")]
         reply, _ = run(catalog, extraction([("latte", 2)], done=True), message)
         assert reply.content.startswith("Thank you! Your order is confirmed")
-        assert "Total: 9.50 USD" in reply.content
+        assert "Total: 9.50 EUR" in reply.content
         assert reply.memory["order"]["status"] == "closed"
 
 
@@ -187,7 +188,7 @@ class TestClosingMessage:
         reply, _ = run(catalog, doubled, history)
         assert reply.memory["order"]["items"] == LATTE_AND_CROISSANT["order"]["items"]
         assert reply.memory["order"]["status"] == "closed"
-        assert "Total: 8.00 USD" in reply.content
+        assert "Total: 8.00 EUR" in reply.content
 
     def test_a_closing_message_that_names_an_item_still_adds_it(self, catalog):
         history = [assistant(LATTE_AND_CROISSANT), user("that's all, plus one more croissant")]
@@ -271,3 +272,24 @@ def test_a_closing_message_can_remove_but_not_add(catalog):
     history = [assistant(LATTE_AND_CROISSANT), user("remove the other one and that's it")]
     reply, _ = run(catalog, extraction([("latte", 3)], done=True), history)
     assert reply.memory["order"]["items"] == [{"product_id": "latte", "quantity": 1}]
+
+
+class TestDay7UserTest:
+    def test_a_misspelling_the_model_added_is_not_also_called_unknown(self, catalog):
+        # The model added a cappuccino and listed "capuchino" as unknown in the same turn.
+        both = extraction([("cappuccino", 1)], unrecognised=["capuchino"])
+        reply, _ = run(catalog, both, [user("plus a capuchino please")])
+        assert "don't have" not in reply.content
+        assert reply.memory["order"]["items"] == [{"product_id": "cappuccino", "quantity": 1}]
+
+    def test_capuchino_alone_is_resolved(self, catalog):
+        reply, _ = run(catalog, extraction(unrecognised=["capuchino"]), [user("a capuchino")])
+        assert reply.memory["order"]["items"] == [{"product_id": "cappuccino", "quantity": 1}]
+
+    def test_an_unknown_item_unlike_what_was_added_is_still_refused(self, catalog):
+        reply, _ = run(catalog, extraction([("latte", 1)], unrecognised=["matcha latte"]))
+        assert 'we don\'t have "matcha latte"' in reply.content
+
+    def test_the_suggestion_request_is_passed_on(self, catalog):
+        reply, _ = run(catalog, extraction([("cranberry-scone", 1)], suggestion="Coffee"))
+        assert reply.trace["suggestion_category"] == "Coffee"

@@ -47,8 +47,12 @@ def test_health_reports_the_catalogue_and_the_model(client):
 def test_the_menu_is_served_with_images(client):
     products = client.get("/api/v1/products").json()
     assert len(products) == 18
-    image = client.get(products[0]["image_url"].replace("http://", "https://"))
-    assert image.status_code == 200 and image.headers["content-type"].startswith("image/")
+    # Every image, with its real type: WebP files were served as application/octet-stream by the
+    # container while the same code passed on a Mac (day 7).
+    for product in products:
+        image = client.get("/api" + product["image_url"].split("/api", 1)[1])
+        assert image.status_code == 200, product["product_id"]
+        assert image.headers["content-type"].startswith("image/"), product["product_id"]
 
 
 def test_a_complete_order_is_billed_exactly(client):
@@ -60,7 +64,7 @@ def test_a_complete_order_is_billed_exactly(client):
         {"role": "user", "content": "that's all"},
     ]
     second = chat(client, history)
-    assert "Total: 8.00 USD" in second["output"]["content"]
+    assert "Total: 8.00 EUR" in second["output"]["content"]
     assert second["output"]["memory"]["order"]["status"] == "closed"
 
 

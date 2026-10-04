@@ -20,6 +20,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 
 from pydantic import ValidationError
+from rapidfuzz import fuzz
 
 from src.api.agents.base import AgentReply, last_user_message, recent_turns
 from src.api.core.catalog import MAX_QUANTITY, Catalog, normalise, quantity_in
@@ -47,12 +48,20 @@ Return the whole order after the customer's latest message:
 - A food or drink the customer wants that is not on the menu: put its name in `unrecognised`.
   Leave out everything that is not an item, such as a request about the receipt, delivery or
   payment, a question, or small talk.
+- Names may be misspelled ("capuchino", "de cappuchino"): match them to the menu item they
+  sound like, both to add an item and to remove or replace one already in the order.
+- If the customer also asks what to choose with the order ("what coffee goes with it?"), put
+  that kind of item in `suggestion_category`.
 - `customer_done` is true when the customer wants nothing else ("that's all", "no thanks") or
   confirms the order.
 """
 
 # The question closing an open order. The orchestrator may replace it with an upsell.
 FOLLOW_UP = "Would you like anything else?"
+
+# A name the model called unknown is the same item as one it added this turn above this
+# similarity: "capuchino" and "Cappuccino" score 84, "matcha latte" and "Latte" 59.
+SAME_ITEM_SCORE = 75
 
 # Customer words are echoed back in the answer: keep them short.
 MAX_ECHO_LENGTH = 40
@@ -143,8 +152,25 @@ class Order:
                 "order_total": str(order.total),
                 "status": memory.status,
                 "awaiting_choice": bool(checked.choices),
+                "suggestion_category": extraction.suggestion_category,
             },
         )
+
+    def added_this_turn(
+        self, text: str, items: Sequence[OrderLineRequest], previous: OrderMemory | None
+    ) -> bool:
+        """The model both added an item and called its misspelled name unknown: same item.
+        Day 7 user test: "Sorry, we don't have 'capuchino'" above a basket holding a cappuccino."""
+        before = {line.product_id for line in (previous.items if previous else [])}
+        for line in items:
+            product = self._catalog.get(line.product_id)
+            if (
+                line.product_id not in before
+                and product is not None
+                and similar(text, product.name)
+            ):
+                return True
+        return False
 
     def check(self, extraction: OrderExtraction, previous: OrderMemory | None = None) -> Checked:
         items: list[OrderLineRequest] = []
@@ -183,7 +209,7 @@ class Order:
                     )
             elif resolution.candidates:
                 choices[text] = [p.name for p in resolution.candidates]
-            else:
+            elif not self.added_this_turn(text, items, previous):
                 unrecognised.append(text)
 
         for text in extraction.ambiguous:
@@ -210,6 +236,10 @@ class Order:
             or product.name not in pending
         ]
         return Checked(items, unrecognised, choices, too_many)
+
+
+def similar(text: str, name: str) -> bool:
+    return fuzz.ratio(" ".join(normalise(text)), " ".join(normalise(name))) >= SAME_ITEM_SCORE
 
 
 def previous_order(messages: Sequence[ChatMessage]) -> tuple[OrderMemory, bool]:

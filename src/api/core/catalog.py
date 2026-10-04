@@ -36,9 +36,10 @@ CANDIDATE_SCORE = 70
 WINNER_MARGIN = 8
 # A near exact spelling of a full name ("lattes", "cappucino") is accepted on its own.
 SPELLING_SCORE = 88
-# One typed word against one word of a name: 87.5 for "expresso"/"espresso", while "scone" and
-# "stone" (80) or "ginger" and "finger" (83) stay apart.
-WORD_SCORE = 85
+# One typed word against one word of a name: 87.5 for "expresso"/"espresso", 84.2 for
+# "capuchino"/"cappuccino" (day 7 user test), while "scone" and "stone" (80) or "ginger" and
+# "finger" (83) stay apart.
+WORD_SCORE = 84
 
 
 class CosmosContainer(Protocol):

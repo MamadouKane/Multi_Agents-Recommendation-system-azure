@@ -71,6 +71,36 @@ PRODUCT_ID_OVERRIDES = {"Dark chocolate": "dark-chocolate-drinking"}
 # Display name corrections. The raw spelling is kept as an alias so customers typing it still match.
 DISPLAY_NAME_FIXES = {"Carmel syrup": "Caramel syrup"}
 
+# Description claims about products the shop does not sell. The source text is marketing copy:
+# three scones "pair with tea", the syrups top "desserts" and "ice cream", and the
+# details agent repeated them faithfully to a customer (day 7 user test). Fixed here, and
+# `tests/unit/test_catalog.py` refuses any description naming an unsold product.
+DESCRIPTION_FIXES: dict[str, list[tuple[str, str]]] = {
+    "Cranberry Scone": [
+        ("pairs wonderfully with tea or coffee", "pairs wonderfully with a coffee")
+    ],
+    "Ginger Scone": [
+        ("pairs beautifully with a cup of tea or coffee", "pairs beautifully with a coffee")
+    ],
+    "Jumbo Savory Scone": [("with your favorite coffee or tea", "with your favorite coffee")],
+    "Carmel syrup": [
+        ("topping your drinks and desserts", "flavouring your drinks"),
+        ("everything from coffee to ice cream", "a coffee or a drinking chocolate"),
+    ],
+    "Chocolate syrup": [("drizzling over desserts or adding to", "adding to")],
+    "Hazelnut syrup": [("perfect for lattes and desserts", "perfect for lattes")],
+    "Sugar Free Vanilla syrup": [("perfect for your coffee or dessert", "perfect for your coffee")],
+    # "Nutty" for a scone without any nut: misleading next to an allergen question (US2).
+    "Oatmeal Scone": [("Nutty and wholesome", "Hearty and wholesome")],
+}
+
+
+def fixed_description(raw_name: str, text: str) -> str:
+    for old, new in DESCRIPTION_FIXES.get(raw_name, []):
+        text = text.replace(old, new)
+    return text
+
+
 # Names customers use that the catalogue name does not contain. "Hot chocolate" is what the Kaggle
 # sales data calls this drink, and what a customer says: without it, fuzzy matching sent
 # "hot chocolate" to the chocolate chip biscotti.
@@ -120,7 +150,7 @@ def enrich(raw: dict[str, Any]) -> Product:
         product_id=product_id,
         name=name,
         category=raw["category"],
-        description=raw["description"].strip(),
+        description=fixed_description(raw_name, raw["description"].strip()),
         ingredients=raw["ingredients"],
         allergens=contains,
         may_contain=may_contain,
@@ -157,7 +187,7 @@ def main() -> int:
     for p in products:
         allergens = ", ".join(p.allergens) or "none"
         extra = f" (may contain {', '.join(p.may_contain)})" if p.may_contain else ""
-        print(f"  {p.product_id:28} {p.price:>5} USD  {allergens}{extra}")
+        print(f"  {p.product_id:28} {p.price:>5} {p.currency}  {allergens}{extra}")
     return 0
 
 

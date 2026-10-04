@@ -28,6 +28,12 @@ from src.api.core.schemas import AgentName, ChatMessage
 from src.api.core.tracing import tracer
 
 UPSELL_ITEMS = 2
+ASKED_LABELS = {
+    "Coffee": "a coffee",
+    "Bakery": "a pastry",
+    "Drinking Chocolate": "a chocolate drink",
+    "Flavours": "a syrup",
+}
 
 
 class Agent(Protocol):
@@ -105,7 +111,23 @@ class Assistant:
         memory = {**carried, **reply.memory, "agent": reply.agent}
         content = reply.content
         upsell: list[str] = []
-        if self.should_upsell(reply, memory):
+        asked = reply.trace.get("suggestion_category") if reply.agent == "order" else None
+        if asked and memory["order"]["items"] and not reply.trace.get("awaiting_choice"):
+            # An explicit request in an order turn ("what coffee goes with it?") is answered with
+            # that kind of item, instead of the generic upsell (day 7 user test).
+            basket = [item["product_id"] for item in memory["order"]["items"]]
+            suggested = self._recommender.for_basket(basket, UPSELL_ITEMS, categories=[asked])
+            if not suggested:
+                suggested = self._recommender.popular([asked], UPSELL_ITEMS)
+            upsell = [p.name for p in suggested]
+            if upsell:
+                content = content.removesuffix(FOLLOW_UP).rstrip()
+                content += (
+                    f"\n\nFor {ASKED_LABELS.get(asked, 'that')}, customers often choose "
+                    f"{join(upsell, 'or')} with this order. Would you like one, or anything else?"
+                )
+                memory["upsell_offered"] = True
+        elif self.should_upsell(reply, memory):
             basket = [item["product_id"] for item in memory["order"]["items"]]
             suggested = self._recommender.for_basket(basket, UPSELL_ITEMS, complements_only=True)
             upsell = [p.name for p in suggested]

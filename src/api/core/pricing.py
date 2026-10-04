@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 from decimal import ROUND_HALF_UP, Decimal
 
 from src.api.core.catalog import Catalog
-from src.api.core.schemas import OrderLineRequest
+from src.api.core.schemas import CURRENCY, OrderLineRequest
 
 CENT = Decimal("0.01")
 
@@ -30,7 +30,7 @@ class PricedLine:
 class PricedOrder:
     lines: tuple[PricedLine, ...]
     total: Decimal
-    currency: str = "USD"
+    currency: str = CURRENCY
     # Identifiers the model produced that the catalogue does not know. Never priced, never billed.
     rejected_ids: tuple[str, ...] = field(default_factory=tuple)
 

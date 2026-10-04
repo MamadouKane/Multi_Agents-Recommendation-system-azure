@@ -21,6 +21,13 @@ from typing import Any, Literal, Protocol
 import httpx
 from azure.ai.contentsafety.models import AnalyzeTextOptions
 from opentelemetry.trace import SpanKind
+from tenacity import (
+    Retrying,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_exponential_jitter,
+    wait_none,
+)
 
 from src.api.core.llm import BearerToken
 from src.api.core.tracing import tracer
@@ -50,6 +57,7 @@ class ContentSafetyGate:
         moderation: ModerationClient,
         token: BearerToken,
         http: httpx.Client | None = None,
+        fast_retry: bool = False,
     ) -> None:
         self._shield_url = (
             f"{endpoint.rstrip('/')}/contentsafety/text:shieldPrompt"
@@ -57,7 +65,17 @@ class ContentSafetyGate:
         )
         self._moderation = moderation
         self._token = token
-        self._http = http or httpx.Client(timeout=10.0)
+        # Short timeouts and one retry on transport errors: on day 7 a run of the evaluation hit
+        # dropped connections and one call that waited the SDK default of 300 s. If the service
+        # stays unreachable the turn fails with a 503: a safety layer that cannot answer must
+        # not wave the message through.
+        self._http = http or httpx.Client(timeout=httpx.Timeout(10.0, connect=5.0))
+        self._retrying = Retrying(
+            retry=retry_if_exception_type(httpx.TransportError),
+            stop=stop_after_attempt(2),
+            wait=wait_none() if fast_retry else wait_exponential_jitter(initial=0.3, max=2),
+            reraise=True,
+        )
 
     def check(self, text: str) -> SafetyVerdict:
         with tracer.start_as_current_span("content_safety", kind=SpanKind.CLIENT) as span:
@@ -76,10 +94,12 @@ class ContentSafetyGate:
         text = text[:MAX_TEXT_LENGTH]
 
         # Prompt Shields first: an injection attempt is the most likely attack on this assistant.
-        response = self._http.post(
-            self._shield_url,
-            headers={"Authorization": f"Bearer {self._token.get()}"},
-            json={"userPrompt": text, "documents": []},
+        response = self._retrying(
+            lambda: self._http.post(
+                self._shield_url,
+                headers={"Authorization": f"Bearer {self._token.get()}"},
+                json={"userPrompt": text, "documents": []},
+            )
         )
         response.raise_for_status()
         if response.json()["userPromptAnalysis"]["attackDetected"]:

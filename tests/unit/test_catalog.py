@@ -136,3 +136,31 @@ class TestRealCatalogue:
     def test_espresso_is_allergen_free(self, catalogue):
         assert catalogue["espresso-shot"].allergens == []
         assert catalogue["espresso-shot"].may_contain == []
+
+
+# Products a customer might expect in a coffee shop, none of which this one sells.
+UNSOLD = [
+    "tea",
+    "muffin",
+    "bagel",
+    "oat milk",
+    "almond milk",
+    "soy milk",
+    "smoothie",
+    "cold brew",
+    "sandwich",
+    "juice",
+    "matcha",
+    "ice cream",
+    "dessert",
+]
+
+
+def test_no_description_mentions_a_product_the_shop_does_not_sell():
+    import re
+
+    from src.data_pipelines.catalog import RAW_PATH, build_catalog, read_jsonl
+
+    for product in build_catalog(read_jsonl(RAW_PATH)):
+        found = [w for w in UNSOLD if re.search(rf"\b{w}s?\b", product.description, re.I)]
+        assert not found, f"{product.name}: {found}"

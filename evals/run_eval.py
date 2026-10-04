@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 import time
 from collections.abc import Callable, Iterable, Mapping, Sequence
@@ -137,6 +138,11 @@ def run_rag(parts: Components, workers: int) -> tuple[dict[str, Any], list[dict[
             "retrieval_abstained": reply.trace["abstained"],
             "answer": reply.content,
             "declined": declined(reply.content),
+            "forbidden_mentions": [
+                w
+                for w in case.get("must_not_mention", [])
+                if re.search(rf"\b{w}\b", reply.content, re.I)
+            ],
         }
         if case["relevant"]:
             result["recall_at_3"] = recall_at_k(documents, case["relevant"], 3)
@@ -160,6 +166,8 @@ def run_rag(parts: Components, workers: int) -> tuple[dict[str, Any], list[dict[
         "rag_relevance_pass_rate": mean([float(r["relevance"] >= 4) for r in judged]),
         "rag_judged_answers": len(judged),
         "rag_errors": len(results) - len(scored),
+        # Products the shop does not sell, mentioned in an answer (day 7 user test: "tea").
+        "rag_unsold_mentions": sum(len(r.get("forbidden_mentions", [])) for r in scored),
     } | abstention_scores(results)
     # ADR-008 asked for the 1.7 gate to be checked on questions it was not chosen on.
     unanswerable = [r["best_reranker_score"] for r in scored if not r["relevant"]]
@@ -194,7 +202,13 @@ def run_orders(parts: Components, workers: int) -> tuple[dict[str, Any], list[di
         order = (
             history[-1].memory["order"] if history[-1].memory else {"items": [], "status": "open"}
         )
+        last = turns[-1]["content"].lower()
+        violations = [p for p in case.get("reply_must_not_contain", []) if p.lower() in last]
+        wanted = case.get("reply_must_contain_any", [])
+        if wanted and not any(w.lower() in last for w in wanted):
+            violations.append(f"none of {wanted}")
         return {
+            "reply_violations": violations,
             "expected_items": case["expected_items"],
             "expected_status": case["expected_status"],
             "final_items": {i["product_id"]: i["quantity"] for i in order["items"]},
@@ -216,6 +230,8 @@ def run_orders(parts: Components, workers: int) -> tuple[dict[str, Any], list[di
         "system_latency_p95_ms": percentile(latencies, 95),
         "cost_per_conversation_usd": mean(costs),
         "cost_per_conversation_max_usd": max(costs, default=0.0),
+        # Replies that contradict the basket or ignore the question asked (day 7 user test).
+        "order_reply_violations": sum(bool(r.get("reply_violations", ["error"])) for r in results),
         "orders_errors": len(results) - len(scored),
     }
     return metrics, results
@@ -356,6 +372,13 @@ def failed_cases(details: Mapping[str, list[dict[str, Any]]]) -> list[str]:
                 f"rag {r['id']}: groundedness={r.get('groundedness')}, "
                 f"relevance={r.get('relevance')}: {r['answer'][:120]!r}"
             )
+    for r in details.get("rag", []):
+        if r.get("forbidden_mentions"):
+            out.append(f"rag {r['id']} mentions {r['forbidden_mentions']}: {r['answer'][:120]!r}")
+    for r in details.get("orders", []):
+        if r.get("reply_violations"):
+            last = r["turns"][-1]["content"][:140]
+            out.append(f"orders {r['id']} reply: {r['reply_violations']}: {last!r}")
     for r in details.get("orders", []):
         if "error" in r:
             out.append(f"orders {r['id']}: {r['error']}")

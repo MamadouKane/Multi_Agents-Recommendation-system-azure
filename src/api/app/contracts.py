@@ -60,7 +60,7 @@ class ProductOut(BaseModel):
                     "allergens": ["milk"],
                     "may_contain": [],
                     "price": "4.75",
-                    "currency": "USD",
+                    "currency": "EUR",
                     "rating": 4.7,
                     "image_url": "https://<api>/api/v1/products/latte/image",
                 }
@@ -76,7 +76,7 @@ class ProductOut(BaseModel):
     allergens: list[Allergen]
     may_contain: list[Allergen]
     price: Price
-    currency: Literal["USD"]
+    currency: Literal["EUR"]
     rating: float
     image_url: str
 

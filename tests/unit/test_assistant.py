@@ -141,3 +141,17 @@ class TestUpsell:
         turn = assistant(catalog, "order", reply).respond([user("a latte and a scone")])
         assert "Customers often add" not in turn.content
         assert turn.memory["upsell_offered"] is False
+
+
+def test_an_order_turn_asking_for_a_coffee_gets_coffees_not_the_generic_upsell(catalog):
+    reply = AgentReply(
+        "order",
+        "Here is your order so far.\nWould you like anything else?",
+        memory={"order": LATTE},
+        trace={"awaiting_choice": False, "suggestion_category": "Coffee"},
+    )
+    turn = assistant(catalog, "order", reply).respond([user("a latte, which other coffee?")])
+    # The rules for a latte rank a cappuccino then a croissant: only the coffee is offered.
+    assert "For a coffee, customers often choose Cappuccino with this order" in turn.content
+    assert "Croissant" not in turn.content
+    assert turn.memory["upsell_offered"] is True

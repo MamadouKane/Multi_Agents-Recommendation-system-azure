@@ -29,7 +29,7 @@ class FakeAssistant:
         if self.error:
             raise self.error
         return Turn(
-            content="A latte is 4.75 USD.",
+            content="A latte is 4.75 EUR.",
             memory={"agent": "details", "order": {"items": [], "status": "open"}},
             agent="details",
             guard=GuardOutcome(True, "coffee_shop", "scope"),
@@ -174,6 +174,12 @@ class TestProducts:
             response = c.get("/api/v1/products/latte/image")
         assert response.status_code == 200
         assert response.headers["content-type"] == "image/jpeg"
+
+    def test_a_webp_image_is_served_as_webp(self, catalog):
+        webp = next(p for p in catalog.products if p.image_file.endswith(".webp"))
+        with client(catalog) as c:
+            response = c.get(f"/api/v1/products/{webp.product_id}/image")
+        assert response.headers["content-type"] == "image/webp"
 
     def test_only_catalogue_images_can_be_requested(self, catalog):
         with client(catalog) as c:

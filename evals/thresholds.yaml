@@ -15,6 +15,10 @@ rag_relevance:              {min: 4.0, target: 4.5, blocking: false}
 order_exact_match:          {min: 0.90, target: 0.95}
 order_total_error:          {equals: 0, target: 0}
 menu_hallucination:         {equals: 0, target: 0}
+# Added after the day 7 user test: a reply contradicting the basket, an unanswered suggestion
+# request, an answer mentioning a product the shop does not sell.
+order_reply_violations:     {equals: 0, target: 0}
+rag_unsold_mentions:        {equals: 0, target: 0}
 system_latency_p95_ms:      {max: 5000, target: 3000}
 cost_per_conversation_usd:  {max: 0.01, target: 0.005}
 

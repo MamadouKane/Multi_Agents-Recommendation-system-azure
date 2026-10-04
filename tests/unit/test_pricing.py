@@ -86,6 +86,6 @@ def test_a_price_with_three_decimals_is_refused_before_it_reaches_a_bill():
 
 def test_the_receipt_states_the_computed_numbers(catalog):
     receipt = price_order([line("latte"), line("croissant", 2)], catalog).receipt()
-    assert "1 x Latte at 4.75 = 4.75 USD" in receipt
-    assert "2 x Croissant at 3.25 = 6.50 USD" in receipt
-    assert receipt.endswith("Total: 11.25 USD")
+    assert "1 x Latte at 4.75 = 4.75 EUR" in receipt
+    assert "2 x Croissant at 3.25 = 6.50 EUR" in receipt
+    assert receipt.endswith("Total: 11.25 EUR")

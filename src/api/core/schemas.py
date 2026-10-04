@@ -14,6 +14,11 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 # EU list of major allergens, restricted to the ones this menu can contain.
 Allergen = Literal["milk", "eggs", "gluten", "tree_nuts", "soy"]
 
+# The menu currency: a display string, prices are not converted. Model costs stay in USD,
+# the currency Azure bills the tokens in.
+Currency = Literal["EUR"]
+CURRENCY: Currency = "EUR"
+
 Category = Literal["Coffee", "Bakery", "Drinking Chocolate", "Flavours"]
 
 
@@ -37,7 +42,7 @@ class Product(BaseModel):
     price: Decimal = Field(
         gt=0, decimal_places=2, description="Unit price, the only price anywhere."
     )
-    currency: Literal["USD"] = "USD"
+    currency: Currency = CURRENCY
     rating: float = Field(ge=0, le=5)
     image_file: str = Field(description="File name in the product-images blob container.")
     aliases: list[str] = Field(
@@ -122,6 +127,10 @@ class OrderExtraction(BaseModel):
         description="Names matching several menu items, such as 'a scone', in the customer's words."
     )
     customer_done: bool = Field(description="True once the customer says they want nothing else.")
+    suggestion_category: Category | None = Field(
+        description="The kind of item the latest message asks a suggestion for, such as Coffee for "
+        "'what coffee do you recommend with it?'; null when no suggestion is asked."
+    )
 
 
 class OrderMemory(BaseModel):

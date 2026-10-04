@@ -76,11 +76,11 @@ def test_uses_the_gated_strategy_on_three_documents(catalog):
 
 def test_a_product_document_is_rendered_from_the_live_catalogue(catalog):
     # The index says 9.99; the catalogue says 4.75. The model must only ever read the catalogue.
-    stale = hit("product-latte", "product", content="Latte. Price: 9.99 USD.")
+    stale = hit("product-latte", "product", content="Latte. Price: 9.99 EUR.")
     agent, _, chat = details(catalog, [stale])
     agent.answer([user("How much is a latte?")])
     prompt = system_prompt(chat)
-    assert f"Price: {catalog.get('latte').price} USD." in prompt
+    assert f"Price: {catalog.get('latte').price} EUR." in prompt
     assert catalog.get("latte").price == Decimal("4.75")
     assert "9.99" not in prompt
 
@@ -110,7 +110,7 @@ def test_a_follow_up_is_rewritten_before_the_search(catalog):
     agent, retriever, _ = details(catalog, [hit("product-latte", "product")], chat)
     history = [
         user("How much is a latte?"),
-        ChatMessage(role="assistant", content="A latte is 4.75 USD."),
+        ChatMessage(role="assistant", content="A latte is 4.75 EUR."),
         user("does it contain lactose?"),
     ]
     reply = agent.answer(history)

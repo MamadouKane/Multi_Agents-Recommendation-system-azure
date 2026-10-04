@@ -23,7 +23,7 @@ class TestScrub:
         assert scrub(text) == expected
 
     @pytest.mark.parametrize(
-        "text", ["2 lattes and 3 croissants", "Total: 11.25 USD", "we open at 8:00", "order 12345"]
+        "text", ["2 lattes and 3 croissants", "Total: 11.25 EUR", "we open at 8:00", "order 12345"]
     )
     def test_order_talk_is_left_alone(self, text):
         assert scrub(text) == text

@@ -70,6 +70,7 @@ class Recommender:
         product_ids: Iterable[str],
         top_k: int = DEFAULT_TOP_K,
         complements_only: bool = False,
+        categories: Sequence[Category] = (),
     ) -> list[Product]:
         """What customers who bought these items also bought, best confidence first.
 
@@ -90,6 +91,14 @@ class Recommender:
                 for pid in ranked
                 if (p := self._catalog.get(pid)) is not None and p.category not in held
             ]
+        if categories:
+            # The customer asked for a kind of item ("what coffee goes with it?").
+            ranked = [
+                pid
+                for pid in ranked
+                if (p := self._catalog.get(pid)) is not None and p.category in categories
+            ]
+            return self.serve(ranked, exclude=basket, top_k=top_k, per_category=top_k)
         return self.serve(ranked, exclude=basket, top_k=top_k)
 
     def popular(

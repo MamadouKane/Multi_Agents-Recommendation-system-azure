@@ -48,7 +48,7 @@ class TestMenu:
     def test_the_menu_carries_no_price(self, catalog):
         # ADR-003: a model that never sees a price cannot invent one.
         menu = catalog.render_menu_for_prompt()
-        assert "$" not in menu and "USD" not in menu
+        assert "$" not in menu and "EUR" not in menu and "USD" not in menu
         assert "4.75" not in menu
 
 
