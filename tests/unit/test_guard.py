@@ -4,6 +4,7 @@ from types import SimpleNamespace
 
 import httpx
 import pytest
+from azure.core.exceptions import ServiceResponseError
 
 from src.api.agents.base import last_user_message, recent_turns
 from src.api.agents.guard import Guard
@@ -182,7 +183,32 @@ def test_a_dropped_connection_is_retried():
     assert len(http.posted) == 1
 
 
+class HangingModeration(FakeModeration):
+    """Times out once, as moderation did during a day 7 evaluation run (15 s, then 10 s)."""
+
+    def __init__(self, hangs):
+        super().__init__({"Hate": 0})
+        self.hangs = hangs
+        self.calls = 0
+
+    def analyze_text(self, options, **kwargs):
+        self.calls += 1
+        if self.hangs:
+            self.hangs -= 1
+            raise ServiceResponseError("Read timed out. (read timeout=3)")
+        return super().analyze_text(options, **kwargs)
+
+
+def test_a_hung_moderation_call_is_retried():
+    moderation = HangingModeration(hangs=1)
+    gate_ = ContentSafetyGate(
+        "https://aif.example/", moderation, FakeToken(), FakeHttp(False), fast_retry=True
+    )
+    assert not gate_.check("A latte please").blocked
+    assert moderation.calls == 2
+
+
 def test_an_unreachable_safety_service_fails_closed():
-    gate_, _ = flaky_gate(failures=5)
+    gate_, _ = flaky_gate(failures=10)
     with pytest.raises(httpx.RemoteProtocolError):
         gate_.check("A latte please")  # an error, never an "allowed" verdict

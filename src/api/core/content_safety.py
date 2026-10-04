@@ -20,6 +20,7 @@ from typing import Any, Literal, Protocol
 
 import httpx
 from azure.ai.contentsafety.models import AnalyzeTextOptions
+from azure.core.exceptions import ServiceRequestError, ServiceResponseError
 from opentelemetry.trace import SpanKind
 from tenacity import (
     Retrying,
@@ -34,6 +35,10 @@ from src.api.core.tracing import tracer
 
 PROMPT_SHIELDS_API_VERSION = "2024-09-01"  # the preview versions are not served in France Central
 MODERATION_BLOCK_SEVERITY = 2
+READ_TIMEOUT_S = 3.0
+ATTEMPTS = 3
+# Network failures and timeouts, from httpx (Prompt Shields) and from the SDK (moderation).
+TRANSIENT = (httpx.TransportError, ServiceRequestError, ServiceResponseError)
 # Content Safety accepts up to 10k characters per call; a chat message is far below that.
 MAX_TEXT_LENGTH = 10_000
 
@@ -65,15 +70,17 @@ class ContentSafetyGate:
         )
         self._moderation = moderation
         self._token = token
-        # Short timeouts and one retry on transport errors: on day 7 a run of the evaluation hit
-        # dropped connections and one call that waited the SDK default of 300 s. If the service
-        # stays unreachable the turn fails with a 503: a safety layer that cannot answer must
-        # not wave the message through.
-        self._http = http or httpx.Client(timeout=httpx.Timeout(10.0, connect=5.0))
+        # Measured over three days: moderation answers in 66 ms at p50 and 0.4 s at p99, Prompt
+        # Shields in 0.3 s at p99, but about one call in 200 hangs (15 s once). A 3 s read timeout
+        # and three attempts cut a hang short instead of failing the turn. Analysing a text has no
+        # side effect, so retrying the POST is safe, which the SDK's own policy will not assume.
+        # If the service stays unreachable the turn fails with a 503: a safety layer that cannot
+        # answer must not wave the message through.
+        self._http = http or httpx.Client(timeout=httpx.Timeout(READ_TIMEOUT_S, connect=5.0))
         self._retrying = Retrying(
-            retry=retry_if_exception_type(httpx.TransportError),
-            stop=stop_after_attempt(2),
-            wait=wait_none() if fast_retry else wait_exponential_jitter(initial=0.3, max=2),
+            retry=retry_if_exception_type(TRANSIENT),
+            stop=stop_after_attempt(ATTEMPTS),
+            wait=wait_none() if fast_retry else wait_exponential_jitter(initial=0.2, max=1),
             reraise=True,
         )
 
@@ -105,7 +112,9 @@ class ContentSafetyGate:
         if response.json()["userPromptAnalysis"]["attackDetected"]:
             return SafetyVerdict(True, "prompt_shields", "attack", elapsed(started))
 
-        result = self._moderation.analyze_text(AnalyzeTextOptions(text=text))
+        result = self._retrying(
+            lambda: self._moderation.analyze_text(AnalyzeTextOptions(text=text))
+        )
         for item in result.categories_analysis:
             if (item.severity or 0) >= MODERATION_BLOCK_SEVERITY:
                 return SafetyVerdict(True, "moderation", str(item.category), elapsed(started))

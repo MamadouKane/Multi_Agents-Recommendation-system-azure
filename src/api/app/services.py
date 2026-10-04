@@ -23,7 +23,7 @@ from src.api.agents.order import Order
 from src.api.agents.recommendation import Recommendation
 from src.api.agents.router import Router
 from src.api.core.catalog import Catalog
-from src.api.core.content_safety import ContentSafetyGate
+from src.api.core.content_safety import READ_TIMEOUT_S, ContentSafetyGate
 from src.api.core.conversations import ConversationStore
 from src.api.core.cost import ModelPrice
 from src.api.core.llm import AzureOpenAIClientFactory, BearerToken, ChatClient, Embedder
@@ -100,8 +100,13 @@ def build_components(settings: Settings) -> Components:
     safety = ContentSafetyGate(
         safety_endpoint,
         # The SDK waits up to 300 s by default; a customer should not.
+        # Timeouts set here, retries left to the gate (see content_safety.py).
         ContentSafetyClient(
-            safety_endpoint, credential, connection_timeout=5, read_timeout=10, retry_total=1
+            safety_endpoint,
+            credential,
+            connection_timeout=5,
+            read_timeout=READ_TIMEOUT_S,
+            retry_total=0,
         ),
         BearerToken(credential),
     )
