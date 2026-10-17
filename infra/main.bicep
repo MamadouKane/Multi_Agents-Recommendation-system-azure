@@ -51,6 +51,9 @@ param deployMl bool = true
 @description('Deploy Azure AI Search. It is the only hourly billed resource, so it is created per working session (ADR-002).')
 param deploySearch bool = true
 
+@description('Run the availability test and the alerts. False while the project is paused (make pause), since both cost money every day even without traffic.')
+param monitoringEnabled bool = true
+
 // Tags are applied to every resource. managed-by makes hand-created resources easy to spot.
 var tags = {
   workload: workload
@@ -213,6 +216,7 @@ module observability 'modules/observability.bicep' = {
     appInsightsName: monitoring.outputs.appInsightsName
     apiUrl: 'https://${containerApp.outputs.fqdn}'
     alertEmail: alertEmail
+    enabled: monitoringEnabled
   }
 }
 

@@ -1,4 +1,4 @@
-.PHONY: venv install install-all lint format typecheck test cov check eval red-team ablation run docker deploy smoke env catalog knowledge recommendations ingest index train-local train publish-model secrets clean infra-preview infra-up search-up search-down
+.PHONY: venv install install-all lint format typecheck test cov check eval red-team ablation run docker deploy smoke env catalog knowledge recommendations ingest index train-local train publish-model secrets clean infra-preview infra-up search-up search-down pause resume
 
 # Every target uses the project virtualenv directly: no need to `source .venv/bin/activate`.
 VENV   := .venv
@@ -117,6 +117,27 @@ search-up:        ## Recreate Azure AI Search for a working session (about 2 EUR
 search-down:      ## Delete Azure AI Search at the end of the session. The index is rebuilt by `make index`.
 	az search service delete -g $(RG) -n $(SEARCH) --yes
 	@echo "Search deleted. Run 'make search-up' then 'make index' at the next session."
+
+# Billed per run even without traffic: the availability test, which also wakes the
+# scaled-to-zero API every 15 minutes, and the five alert rules (measured in October).
+MONITORS := webtests/webtest-coffeeai-health \
+	$(foreach a,api-error-rate api-unavailable chat-latency-p95 daily-model-cost order-total-mismatch,scheduledqueryrules/alert-coffeeai-$(a))
+
+pause:            ## Stop what costs money while nobody works on the project; only the registry stays billed
+	@for m in $(MONITORS); do \
+		field=$$([ "$${m%%/*}" = webtests ] && echo Enabled || echo enabled); \
+		az resource update -g $(RG) -n $${m#*/} --resource-type Microsoft.Insights/$${m%%/*} \
+			--set properties.$$field=false -o none && echo "paused  $${m#*/}"; \
+	done
+	@if az search service show -g $(RG) -n $(SEARCH) -o none 2>/dev/null; then $(MAKE) search-down; fi
+	@echo "Paused. 'make resume' turns the monitoring back on; 'make search-up' recreates AI Search."
+
+resume:           ## Turn the availability test and the alerts back on (AI Search: make search-up)
+	@for m in $(MONITORS); do \
+		field=$$([ "$${m%%/*}" = webtests ] && echo Enabled || echo enabled); \
+		az resource update -g $(RG) -n $${m#*/} --resource-type Microsoft.Insights/$${m%%/*} \
+			--set properties.$$field=true -o none && echo "resumed $${m#*/}"; \
+	done
 
 secrets:          ## Scan the working tree for leaked secrets
 	gitleaks detect --source . --no-git -v

@@ -24,6 +24,9 @@ param alertEmail string = ''
 @allowed([ 300, 600, 900 ])
 param availabilityFrequency int = 900
 
+@description('False pauses the availability test and the alerts: both are billed per run, and the test keeps waking the API (make pause / make resume).')
+param enabled bool = true
+
 resource appInsights 'Microsoft.Insights/components@2020-02-02' existing = {
   name: appInsightsName
 }
@@ -117,7 +120,7 @@ resource alerts 'Microsoft.Insights/scheduledQueryRules@2023-12-01' = [
       displayName: rule.name
       description: rule.description
       severity: rule.severity
-      enabled: true
+      enabled: enabled
       scopes: [ workspaceId ]
       evaluationFrequency: rule.frequency
       windowSize: rule.window
@@ -151,7 +154,7 @@ resource availability 'Microsoft.Insights/webtests@2022-06-15' = {
     SyntheticMonitorId: 'webtest-coffeeai-health'
     Name: 'API /health'
     Kind: 'standard'
-    Enabled: true
+    Enabled: enabled
     Frequency: availabilityFrequency
     Timeout: 120 // a cold start loads the catalogue and the recommender
     RetryEnabled: true

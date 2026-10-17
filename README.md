@@ -144,7 +144,29 @@ make deploy                       # image built in the registry, blue/green depl
 make eval                         # the golden suite against the real services
 ```
 
-`make search-down` at the end of a session; `az group delete -n rg-coffeeai-dev` removes everything.
+`az group delete -n rg-coffeeai-dev` removes everything.
+
+### Pause and resume
+
+Even without traffic, the availability test and the alerts are billed per run, and the test wakes
+the scaled-to-zero API every 15 minutes: about 0.88 EUR a day while idle, measured (see the cost
+analysis in `docs/`).
+
+```bash
+# End of a session
+make pause                        # availability test and alerts off, AI Search deleted if running
+
+# Start of a session, in this order
+make resume                       # availability test and alerts back on
+make search-up                    # AI Search, 15 to 20 minutes to create
+make index                        # the index is empty after a re-creation
+make smoke                        # end-to-end check of the deployed API
+```
+
+Paused, only the container registry is billed (about 0.15 EUR a day), and nobody is alerted if the
+API goes down. Without AI Search, orders and recommendations still work, but questions about the
+menu and the shop do not, nor does `make eval`. An infrastructure deployment keeps the state it
+finds: it never resumes a paused project.
 
 ### CI/CD
 

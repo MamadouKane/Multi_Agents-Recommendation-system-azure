@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
 # Prints the Bicep parameters that keep what runs today:
-#   -p apiImage=<image> -p apiVersion=<commit> [-p deploySearch=<true|false>]
+#   -p apiImage=<image> -p apiVersion=<commit> -p monitoringEnabled=<true|false>
+#   [-p deploySearch=<true|false>]
 #
 # Used by `make infra-preview`, `make infra-up` and the infra workflow, so that redeploying the
 # infrastructure never swaps the API back to the placeholder image, and never creates AI Search
-# (0.09 EUR per hour) when it was deleted, nor deletes it in the middle of a session.
+# (0.09 EUR per hour) when it was deleted, nor deletes it in the middle of a session, nor turns
+# the monitoring back on while the project is paused (make pause).
 # Pass --no-search to leave deploySearch out (make search-up sets it explicitly).
 set -euo pipefail
 RG="${1:-rg-coffeeai-dev}"
@@ -25,6 +27,12 @@ if [[ -n "$serving" ]]; then
 fi
 [[ -z "$image" ]] && image="mcr.microsoft.com/k8se/quickstart:latest"  # first deployment
 params="-p apiImage=$image -p apiVersion=${version:-placeholder}"
+
+# Paused when the availability test exists and is disabled; a first deployment turns it on.
+monitoring=$(az resource show -g "$RG" -n webtest-coffeeai-health \
+  --resource-type Microsoft.Insights/webtests --query properties.Enabled -o tsv 2>/dev/null || true)
+[[ "$monitoring" == "false" ]] && params="$params -p monitoringEnabled=false" \
+  || params="$params -p monitoringEnabled=true"
 
 if [[ "${4:-}" != "--no-search" ]]; then
   if az search service show -g "$RG" -n "$SEARCH" -o none 2>/dev/null; then
