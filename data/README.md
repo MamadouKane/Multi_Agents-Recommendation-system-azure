@@ -18,9 +18,9 @@ This folder is **read-only**. Transformations write to `data/processed/` (Git-ig
 
 | Source | What it contains |
 |---|---|
-| `raw/knowledge/menu_items.txt` | **2 lines**: Drinking Chocolate $5.00 · Packaged Chocolate $3.00 |
+| `raw/knowledge/menu_items.txt` | **2 lines**: Drinking Chocolate $5.00, Packaged Chocolate $3.00 |
 | `raw/products.jsonl` | **1 record**: "Dark chocolate", category Drinking Chocolate, $5.00 |
-| `legacy/recommendation_objects/popularity_recommendation.csv` | **2 rows**: Drinking (947 transactions) · Packaged (22) |
+| `legacy/recommendation_objects/popularity_recommendation.csv` | **2 rows**: Drinking (947 transactions), Packaged (22) |
 
 Consequences: a customer ordering "Dark chocolate" can be charged $5.00 or $3.00 depending on which source is consulted, and the recommender can suggest the Packaged variant, which has no catalogue record.
 

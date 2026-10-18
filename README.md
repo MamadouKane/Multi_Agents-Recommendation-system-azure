@@ -179,17 +179,42 @@ Then create a `production` environment with a required reviewer in the repositor
 ## Repository layout
 
 ```
-├─ infra/                Bicep: main.bicep, modules/, workbooks/, shared/roles.bicep
+├─ infra/                       Bicep, deployed by `make infra-up` and cd-infra
+│  ├─ main.bicep                 entry point: parameters, modules, outputs
+│  ├─ modules/                   one file per service (Container Apps, AI Search, Cosmos DB...)
+│  ├─ shared/                    built-in role ids
+│  └─ workbooks/                 the Azure Monitor workbook, as code
 ├─ src/
-│  ├─ api/               FastAPI: app/ (HTTP, telemetry), agents/, core/ (LLM, search, pricing...)
-│  ├─ data_pipelines/    catalogue enrichment and ingestion, knowledge corpus, search index
-│  └─ ml/                Azure ML recommender: components/, reco/ (data, rules, evaluation)
-├─ evals/                golden datasets, evaluators, run_eval, red team, load test, reports
-├─ tests/                unit tests, smoke tests against a deployment
-├─ scripts/              deployment, OIDC setup, infrastructure state
-├─ .github/workflows/    ci, eval, cd-api, cd-infra, ml-train
-├─ data/                 raw catalogue, images, knowledge base, sales data
-└─ legacy/               the original prototype, read only
+│  ├─ api/                       the FastAPI service, one container image
+│  │  ├─ app/                    HTTP layer: entry point, contracts, telemetry
+│  │  │  ├─ routers/             /chat and /products
+│  │  │  └─ web/                 the minimal chat page served at /
+│  │  ├─ agents/                 guard, router, details, order, recommendation, orchestrator
+│  │  └─ core/                   model client, search, catalogue, pricing, Content Safety, settings
+│  ├─ data_pipelines/            catalogue enrichment and ingestion, knowledge corpus, search index
+│  └─ ml/                        recommender training on Azure ML, publication to the API
+│     ├─ components/             pipeline steps: prepare, train, evaluate, register
+│     └─ reco/                   data, association rules, evaluation, MLflow tracking, serving
+├─ evals/                        evaluation: run_eval, red team, retrieval ablation, load test
+│  ├─ datasets/                  golden cases: guard, routing, retrieval, RAG, orders, red team
+│  ├─ evaluators/                deterministic checks and LLM judges
+│  └─ reports/                   baseline and red team results
+├─ tests/
+│  ├─ unit/                      no network, fakes for every Azure service
+│  └─ smoke/                     against a deployed API, run by the blue/green deployment
+├─ scripts/                      blue/green deployment, OIDC setup, infrastructure state
+├─ .github/
+│  └─ workflows/                 ci, eval, cd-api, cd-infra, ml-train
+├─ data/
+│  ├─ raw/                       catalogue, product images, sales transactions
+│  └─ knowledge/                 hand-written shop documents (hours, delivery, FAQ...)
+├─ docs/
+│  ├─ architecture.md            diagrams of the system as built
+│  └─ assets/                    the architecture diagram
+└─ legacy/                       the original prototype, read only
+   ├─ agents/                    the five legacy agents
+   ├─ notebooks/                 vector database, upload, recommender training
+   └─ recommendation_objects/    the prototype's recommender artefacts
 ```
 
 ## Documentation
