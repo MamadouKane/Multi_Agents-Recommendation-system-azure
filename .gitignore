@@ -48,8 +48,8 @@ evals/reports/*
 !evals/reports/load_test.json
 
 # ---- Docs (temporarily untracked: cleanup in progress, re-added at the end of the project) ----
-# Exceptions: the documents already reviewed for publication, and the diagram used by the
-# README, otherwise it would not render on GitHub.
+# Exceptions: the documents already reviewed for publication, and the diagram, screenshot and
+# demo used by the README, otherwise they would not render on GitHub.
 # Git does not descend into an excluded directory, so the exclusion is written entry by entry.
 docs/*
 !docs/architecture.md
@@ -59,6 +59,9 @@ docs/*
 !docs/assets/
 docs/assets/*
 !docs/assets/archi-simplified-v2.svg
+!docs/assets/web-app.png
+!docs/assets/demo.gif
+!docs/assets/demo.mp4
 
 # ---- OS / IDE ----
 .DS_Store

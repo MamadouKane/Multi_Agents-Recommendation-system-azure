@@ -108,3 +108,23 @@ dominates and the all-included cost per conversation rises to about 0.04 USD.
 - Cost Management query, resource group scope, 2026-10-02.
 - `evals/reports/load_test.json`, `evals/reports/baseline.md`, KQL in `docs/kql_cookbook.md`.
 - Model prices: configuration defaults (OpenAI list price for gpt-5.4-mini, Data Zone price still to confirm). Content Safety: Azure pricing page, 0.375 USD per 1,000 text records.
+
+## Final cost (measured)
+
+Cost Management, resource group `rg-coffeeai-dev`, 2026-09-18 to 2026-10-28, the day the resources
+were deleted: **20.24 EUR**, with a day or two of usage still to be reported (about 21 EUR in all).
+
+| Service | EUR |
+|---|---|
+| Container Registry (Basic) | 5.17 |
+| Azure Monitor (alerts, availability test) | 3.86 |
+| Azure AI Search (Basic, per working session) | 3.86 |
+| Foundry models (gpt-5.4-mini, embeddings) | 3.48 |
+| Container Apps | 2.58 |
+| Foundry tools (Content Safety) | 1.11 |
+| Virtual machines, storage, load balancer, Cosmos DB, Key Vault, Log Analytics | 0.17 |
+
+The model calls are about a sixth of the bill. The largest lines are the ones billed by the day
+whatever the traffic: the registry, then the monitoring, which also kept the API awake (see the
+idle cost above). For a portfolio project, the lesson is to pause what is billed per hour or per
+run as soon as a session ends, and to delete everything once it is delivered.

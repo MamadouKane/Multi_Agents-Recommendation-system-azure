@@ -12,6 +12,14 @@ This repository rebuilds a prototype that ran on OpenAI, Pinecone and Firebase, 
 evaluation. It covers the whole lifecycle: design, infrastructure as code, data, retrieval, agents,
 MLOps, evaluation, delivery and monitoring.
 
+## Status
+
+Finished and **decommissioned on 2026-10-28**: the Azure resources were deleted to stop all costs,
+and the workflows that reach Azure are disabled. The demo below was recorded on the live system
+the same day, and every result in this page was measured on it. Everything can be rebuilt from an
+empty resource group in about 15 minutes, AI Search creation and model training aside: see
+[Reproduce it](#reproduce-it).
+
 ## Demo
 
 Three questions, one per agent: an allergen question answered from the shop's documents (details),
@@ -29,13 +37,13 @@ next to the menu read from the catalogue:
 
 | | Measured |
 |---|---|
-| **Golden suite, 100 cases** | every blocking threshold met: routing accuracy 1.00, guard recall 1.00 with 0 false positives, retrieval recall@3 1.00, groundedness 4.75 / 5, order exact match 1.00, **order total error 0**, **no invented product or price** |
+| **Golden suite, 104 cases** | every blocking threshold met on the final version: routing accuracy 1.00, guard recall 1.00 with 0 false positives, retrieval recall@3 1.00, groundedness 4.71 / 5, order exact match 0.96, **order total error 0**, **no invented product or price**, p95 latency 2.3 s |
 | **Red team, 20 attacks** | 20 contained: jailbreaks, prompt leaks, price injection, forged memory, markup echo, oversized input |
 | **Recommender** | hit@5 **0.720** against 0.496 for "suggest the best sellers", 95 % interval of the gain [+0.202, +0.248]; +0.114 against best sellers that also never offer a second drink. The prototype's recommender scored **below** the baseline |
 | **Load test**, 10 users, 5 minutes | 0 errors, p50 **1.85 s**, p95 **2.70 s** |
-| **Cost** | about **0.004 USD per conversation**; 6.12 EUR for the whole two-week build |
+| **Cost** | about **0.004 USD per conversation**; about **21 EUR** for the whole project, from the first resource to decommissioning (Cost Management, September 18 to October 28, 2026) |
 | **Delivery** | blue/green with automatic rollback, tested with a deliberately broken image; infrastructure, data, image and deployment rebuilt from an empty resource group in about 15 minutes (AI Search creation and model training aside) |
-| **Code** | 311 unit tests, 96 % coverage, no secret in the history (gitleaks) |
+| **Code** | 326 unit tests, 95 % coverage, no secret in the history (gitleaks) |
 
 ## What it does
 
@@ -99,8 +107,8 @@ catalogue is the single source of truth**, rendered into the prompts at runtime.
 
 ## How quality is measured
 
-- **Golden datasets** (`evals/datasets/`): 30 routing cases, 25 RAG questions (5 without an answer),
-  25 multi-turn orders, 20 guard cases. Expected totals and documents are themselves checked by tests.
+- **Golden datasets** (`evals/datasets/`): 30 routing cases, 26 RAG questions (5 without an answer),
+  28 multi-turn orders, 20 guard cases. Expected totals and documents are themselves checked by tests.
 - **Deterministic evaluators first** (accuracy, recall, exact match, total error, catalogue
   membership), **LLM judges** only for groundedness and relevance.
 - **`make eval`** runs everything against the real services in about 80 seconds and exits 1 when a
