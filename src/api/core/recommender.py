@@ -23,6 +23,15 @@ DEFAULT_TOP_K = 5
 # Kept from the prototype: without it, a latte brings back four syrups and nothing else.
 MAX_PER_CATEGORY = 2
 
+# Coffee and drinking chocolate are one kind of item, the drink of the order: they replace each
+# other rather than go together. Day 9 demo: a latte brought a Dark chocolate upsell, because
+# the two sit in different categories and are often bought together, for two people.
+DRINKS: frozenset[Category] = frozenset({"Coffee", "Drinking Chocolate"})
+
+
+def kind(category: Category) -> str:
+    return "drink" if category in DRINKS else category
+
 
 class Association(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
@@ -74,9 +83,10 @@ class Recommender:
     ) -> list[Product]:
         """What customers who bought these items also bought, best confidence first.
 
-        `complements_only` leaves out the categories already in the basket: someone holding a
-        latte is offered a syrup or a pastry, not a cappuccino. The rules alone cannot tell a
-        complement from a substitute, since both are often bought together.
+        A basket holding a drink is never offered another one, and `complements_only` also
+        leaves out the other kinds already in the basket: someone holding a latte and a
+        croissant is offered a syrup. The rules alone cannot tell a complement from a
+        substitute, since both are often bought together.
         """
         basket = set(product_ids)
         best: dict[str, float] = {}
@@ -84,13 +94,10 @@ class Recommender:
             for rule in self._artifacts.rules.get(product_id, []):
                 best[rule.product_id] = max(best.get(rule.product_id, 0.0), rule.confidence)
         ranked = sorted(best, key=lambda pid: (-best[pid], pid))
-        if complements_only:
-            held = {p.category for pid in basket if (p := self._catalog.get(pid)) is not None}
-            ranked = [
-                pid
-                for pid in ranked
-                if (p := self._catalog.get(pid)) is not None and p.category not in held
-            ]
+        if not categories:
+            held = self.held_kinds(basket)
+            banned = held if complements_only else held & {"drink"}
+            ranked = [pid for pid in ranked if self.kind_of(pid) not in banned]
         if categories:
             # The customer asked for a kind of item ("what coffee goes with it?").
             ranked = [
@@ -100,6 +107,13 @@ class Recommender:
             ]
             return self.serve(ranked, exclude=basket, top_k=top_k, per_category=top_k)
         return self.serve(ranked, exclude=basket, top_k=top_k)
+
+    def held_kinds(self, product_ids: Iterable[str]) -> set[str]:
+        return {k for pid in product_ids if (k := self.kind_of(pid)) is not None}
+
+    def kind_of(self, product_id: str) -> str | None:
+        product = self._catalog.get(product_id)
+        return kind(product.category) if product is not None else None
 
     def popular(
         self, categories: Sequence[Category] = (), top_k: int = DEFAULT_TOP_K

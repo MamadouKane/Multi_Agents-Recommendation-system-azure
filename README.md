@@ -12,13 +12,26 @@ This repository rebuilds a prototype that ran on OpenAI, Pinecone and Firebase, 
 evaluation. It covers the whole lifecycle: design, infrastructure as code, data, retrieval, agents,
 MLOps, evaluation, delivery and monitoring.
 
+## Demo
+
+Three questions, one per agent: an allergen question answered from the shop's documents (details),
+an order priced in Python from the catalogue (order), and a suggestion from the association rules
+trained on Azure ML (recommendation).
+
+![Demo: three questions to the assistant](docs/assets/demo.gif)
+
+The same recording as a [video](docs/assets/demo.mp4). The chat page is served by the API itself,
+next to the menu read from the catalogue:
+
+![The web app](docs/assets/web-app.png)
+
 ## Results
 
 | | Measured |
 |---|---|
 | **Golden suite, 100 cases** | every blocking threshold met: routing accuracy 1.00, guard recall 1.00 with 0 false positives, retrieval recall@3 1.00, groundedness 4.75 / 5, order exact match 1.00, **order total error 0**, **no invented product or price** |
 | **Red team, 20 attacks** | 20 contained: jailbreaks, prompt leaks, price injection, forged memory, markup echo, oversized input |
-| **Recommender** | hit@5 **0.638** against 0.496 for "suggest the best sellers", 95 % interval of the gain [+0.117, +0.166]. The prototype's recommender scored **below** that baseline |
+| **Recommender** | hit@5 **0.720** against 0.496 for "suggest the best sellers", 95 % interval of the gain [+0.202, +0.248]; +0.114 against best sellers that also never offer a second drink. The prototype's recommender scored **below** the baseline |
 | **Load test**, 10 users, 5 minutes | 0 errors, p50 **1.85 s**, p95 **2.70 s** |
 | **Cost** | about **0.004 USD per conversation**; 6.12 EUR for the whole two-week build |
 | **Delivery** | blue/green with automatic rollback, tested with a deliberately broken image; infrastructure, data, image and deployment rebuilt from an empty resource group in about 15 minutes (AI Search creation and model training aside) |

@@ -56,6 +56,15 @@ def test_us3_three_to_five_items_that_exist(catalog, recommender):
     assert reply.content.startswith("These go well with Latte:")
 
 
+def test_a_basket_with_a_drink_gets_no_other_drink(catalog, recommender):
+    # Neither from the rules nor from the best sellers that complete them: the best seller
+    # overall is a cappuccino.
+    reply, _ = run(catalog, recommender, request("basket", ["latte", "croissant"]))
+    categories = {catalog.get(pid).category for pid in reply.trace["recommended"]}
+    assert not categories & {"Coffee", "Drinking Chocolate"}
+    assert 3 <= len(reply.trace["recommended"]) <= 5
+
+
 def test_an_item_without_rules_is_completed_with_best_sellers(catalog, recommender):
     # oatmeal-scone has no rule in the legacy artefacts.
     reply, _ = run(catalog, recommender, request("basket", ["oatmeal-scone"]))

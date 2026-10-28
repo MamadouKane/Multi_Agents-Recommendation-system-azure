@@ -33,7 +33,8 @@ def test_the_pipeline_selects_trains_and_registers_a_servable_model(tmp_path, mo
         tmp_path / "selection",
     )
     selected = read_json(tmp_path / "selection" / "selected.json")
-    assert selected["chosen_min_support"] == 0.01  # 0.660 against 0.620 on validation
+    # 0.752 against 0.699 on validation: with no second drink served, fewer and stronger rules win.
+    assert selected["chosen_min_support"] == 0.05
     assert [s["min_support"] for s in selected["sweep"]] == [0.01, 0.05]
 
     run(
@@ -47,8 +48,8 @@ def test_the_pipeline_selects_trains_and_registers_a_servable_model(tmp_path, mo
         tmp_path / "model",
     )
     metrics = read_json(tmp_path / "model" / "metrics.json")
-    # Share of the catalogue with at least one rule: 14 of 18 products at 0.01.
-    assert metrics["catalogue_coverage"] == metrics["antecedents"] / 18 == 14 / 18
+    # Share of the catalogue with at least one rule: 6 of 18 products at 0.05.
+    assert metrics["catalogue_coverage"] == metrics["antecedents"] / 18 == 6 / 18
 
     run(register, monkeypatch, "--model_dir", tmp_path / "model", "--model_name", "test-reco")
     model = mlflow.pyfunc.load_model("models:/test-reco/1")

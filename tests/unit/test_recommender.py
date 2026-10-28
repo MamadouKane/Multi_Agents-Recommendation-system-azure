@@ -79,6 +79,41 @@ class TestRecommender:
         )
         assert len(r.for_basket(["latte"])) == 2
 
+    def test_a_drink_never_brings_another_drink(self, catalog):
+        # Coffee and drinking chocolate replace each other: a latte gets a pastry, not a
+        # dark chocolate nor a cappuccino (day 9 demo: a latte brought a Dark chocolate).
+        r = Recommender(
+            artifacts(
+                {
+                    "latte": [
+                        ("dark-chocolate-drinking", 0.6),
+                        ("cappuccino", 0.5),
+                        ("croissant", 0.4),
+                    ]
+                }
+            ),
+            catalog,
+        )
+        assert [p.product_id for p in r.for_basket(["latte"])] == ["croissant"]
+        assert [p.product_id for p in r.for_basket(["latte"], complements_only=True)] == [
+            "croissant"
+        ]
+
+    def test_a_pastry_alone_can_bring_a_drink(self, catalog):
+        r = Recommender(
+            artifacts({"croissant": [("latte", 0.6), ("dark-chocolate-drinking", 0.4)]}), catalog
+        )
+        assert [p.product_id for p in r.for_basket(["croissant"])] == [
+            "latte",
+            "dark-chocolate-drinking",
+        ]
+
+    def test_a_drink_asked_for_explicitly_is_served(self, catalog):
+        # "Which hot chocolate goes with it?": the customer asked, the rule does not apply.
+        r = Recommender(artifacts({"latte": [("dark-chocolate-drinking", 0.6)]}), catalog)
+        products = r.for_basket(["latte"], categories=["Drinking Chocolate"])
+        assert [p.product_id for p in products] == ["dark-chocolate-drinking"]
+
     def test_popular_within_one_category_is_not_capped_at_two(self, catalog, conversion):
         products = Recommender(conversion.artifacts, catalog).popular(["Bakery"], top_k=5)
         assert len(products) == 5

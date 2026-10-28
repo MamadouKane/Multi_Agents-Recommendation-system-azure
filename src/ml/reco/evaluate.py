@@ -28,7 +28,7 @@ from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 
 from .data import Basket
-from .serve import Rules, for_basket, popular
+from .serve import Rules, for_basket, kind, popular
 
 K = 5
 Recommend = Callable[[Sequence[str]], list[str]]
@@ -66,9 +66,14 @@ def models(
         return for_basket(rules, categories, given, top_k=K)
 
     def by_rules_then_popularity(given: Sequence[str]) -> list[str]:
-        # What the API serves: the rules, then capped best sellers up to k.
+        # What the API serves: the rules, then capped best sellers up to k, never a second drink.
         chosen = by_rules(given)
-        for product_id in popular(counts, categories, exclude=[*given, *chosen], top_k=K):
+        drinks = (
+            [pid for pid, category in categories.items() if kind(category) == "drink"]
+            if any(kind(categories.get(pid)) == "drink" for pid in given)
+            else []
+        )
+        for product_id in popular(counts, categories, exclude=[*given, *chosen, *drinks], top_k=K):
             if len(chosen) == K:
                 break
             chosen.append(product_id)

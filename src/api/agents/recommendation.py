@@ -14,7 +14,7 @@ from src.api.agents.base import AgentReply, recent_turns
 from src.api.agents.order import join, previous_order
 from src.api.core.catalog import Catalog
 from src.api.core.llm import DECISION, ChatClient
-from src.api.core.recommender import Recommender
+from src.api.core.recommender import Recommender, kind
 from src.api.core.schemas import ChatMessage, Product, RecommendationRequest
 
 # US3: three to five items.
@@ -99,12 +99,15 @@ class Recommendation:
                 # Completed up to MAX_ITEMS, not MIN_ITEMS: on the test week, rules plus best
                 # sellers beat best sellers alone by 0.15 hit@5, rules alone did not (model card).
                 if len(products) < MAX_ITEMS:
-                    # Some items have no rule: complete with best sellers, never repeating.
+                    # Some items have no rule: complete with best sellers, never repeating, and
+                    # never a second drink (the best seller overall is a cappuccino).
                     seen = {p.product_id for p in products} | set(anchors)
+                    drink_held = "drink" in self._recommender.held_kinds(anchors)
                     extra = [
                         p
-                        for p in self._recommender.popular(top_k=MAX_ITEMS + len(seen))
+                        for p in self._recommender.popular(top_k=len(self._catalog.products))
                         if p.product_id not in seen
+                        and not (drink_held and kind(p.category) == "drink")
                     ]
                     products += extra[: MAX_ITEMS - len(products)]
                 return products, "basket"
