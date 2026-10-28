@@ -265,7 +265,7 @@ def compose(order: PricedOrder, checked: Checked, closed: bool, had_items: bool,
     if checked.too_many:
         parts.append(
             f"Sorry, I can take up to {MAX_QUANTITY} of an item ({join(checked.too_many, 'and')})."
-            " For a larger order, please contact the café at least 24 hours ahead."
+            " For a larger order, please contact the shop at least 24 hours ahead."
         )
     for text, names in checked.choices.items():
         # "a scone" -> "scone": the filler words the resolver ignores read badly in a question.
